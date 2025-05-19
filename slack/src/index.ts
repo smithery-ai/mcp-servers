@@ -11,6 +11,8 @@ import { z } from "zod"
 import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js";
 import { mcpAuthRouter } from "@modelcontextprotocol/sdk/server/auth/router.js"
 import { SlackServerAuthProvider } from "./provider.js"
+import express from 'express';
+import cors from "cors";
 
 function setupResources(
 	config: {
@@ -108,6 +110,25 @@ function setupResources(
 		},
 	)
 }
+
+// Create the main Express app first
+const mainApp = express();
+
+// Add CORS middleware to main app BEFORE anything else
+mainApp.use(cors({
+    origin: ['http://localhost:5173'],
+    methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+        'Origin', 
+        'X-Requested-With', 
+        'Content-Type', 
+        'Accept', 
+        'Authorization',
+        'mcp-session-id',
+		'mcp-protocol-version'
+    ],
+    credentials: true
+}));
 
 // Create stateful server with Slack client configuration
 const { app } = createStatefulServer<{
@@ -314,19 +335,20 @@ const { app } = createStatefulServer<{
 	}
 })
 
+mainApp.use(app)
+
 const provider = new SlackServerAuthProvider
 
-app.use("/mcp", requireBearerAuth({
-	provider: provider
-}))
-
-app.use(mcpAuthRouter({
+mainApp.use(mcpAuthRouter({
 	provider: provider,
 	issuerUrl: new URL("http://localhost:8081"),
 }))
 
+mainApp.use("/mcp", requireBearerAuth({
+	provider: provider
+}), app)
 
-app.get("/oauth/callback", async(req, res) => {
+mainApp.get("/oauth/callback", async(req, res) => {
 	const { code, state } = req.query;
 	if (!code || !state) {
 		res.status(400).send("Invalid request parameters");
@@ -336,17 +358,15 @@ app.get("/oauth/callback", async(req, res) => {
 	try {
 		const result = await provider.handleOAuthCallback(code as string, state as string);
 		console.log("Redirecting to:", result.redirectUrl, "with code:", result.mcpAuthCode)
-		res.redirect(`${result.redirectUrl}&code=${result.mcpAuthCode}`);
+		res.redirect(`${result.redirectUrl}?code=${result.mcpAuthCode}`);
 	} catch (error) {
 		console.error("Error in callback handler:", error);
 		res.status(400).send("Server error during authentication callback");
 	}
 });
 
-
-// Start the server
-const PORT = process.env.PORT || 8081
-
-app.listen(PORT, () => {
-	console.log(`MCP server running on port ${PORT}`)
+// Start the server with mainApp
+const PORT = process.env.PORT || 8081;
+mainApp.listen(PORT, () => {
+	console.log(`MCP server running on port ${PORT}`);
 })
