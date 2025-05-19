@@ -116,7 +116,7 @@ const mainApp = express();
 
 // Add CORS middleware to main app BEFORE anything else
 mainApp.use(cors({
-    origin: ['http://localhost:5173'],
+    origin: ['http://localhost:5173', 'http://127.0.0.1:6274'],
     methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
         'Origin', 
