@@ -13,6 +13,7 @@ import { mcpAuthRouter } from "@modelcontextprotocol/sdk/server/auth/router.js"
 import { SlackServerAuthProvider } from "./provider.js"
 import express from 'express';
 import cors from "cors";
+import { encryptionService } from "./encryptionService.js"
 
 function setupResources(
 	config: {
@@ -131,13 +132,11 @@ mainApp.use(cors({
 }));
 
 // Create stateful server with Slack client configuration
-const { app } = createStatefulServer<{
-	token: string
-	signingSecret?: string
-	appToken?: string
-}>(({ config }) => {
+const { app } = createStatefulServer<{}>(({ config }) => {
 	try {
 		console.log("Starting Slack MCP Server...")
+
+		let slackToken: string | null = null
 
 		// Create a new MCP server with the higher-level API
 		const server = new McpServer({
@@ -145,13 +144,35 @@ const { app } = createStatefulServer<{
 			version: "1.0.0",
 		})
 
-		// Initialize the Slack client
-		const slackClient = new WebClient(config.token)
+		// Create single WebClient instance with the token
+		app.use((req, res, next) => {
+			if (!slackToken) {
+			  const mcpToken = req.auth?.token
+			  if (!mcpToken) {
+				res.status(401).json({ error: "MCP token not found in request" })
+				return
+			  }
+			  console.log("mcpToken", mcpToken)
+			  slackToken = encryptionService.decryptToken(mcpToken)
+			  console.log("slackToken", slackToken)
+			}
+			next()
+		})
 
-		const socketMode = !!config.appToken && !!config.signingSecret
+		if (!slackToken) {
+			throw new Error("Slack token not found")
+		}
+
+		// Initialize the Slack client
+		const slackClient = new WebClient(slackToken)
+
+		// Get config from environment variables
+		const signingSecret = process.env.SLACK_SIGNING_SECRET
+		const appToken = process.env.SLACK_APP_TOKEN
+		const socketMode = !!appToken && !!signingSecret
 
 		if (socketMode) {
-			setupResources(config, server)
+			setupResources({ token: slackToken, signingSecret, appToken }, server)
 		}
 
 		// List channels tool

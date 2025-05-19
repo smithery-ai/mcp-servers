@@ -7,43 +7,42 @@ import { WebClient } from "@slack/web-api";
 import crypto from "crypto";
 import { 
     InvalidTokenError,
-    InvalidGrantError, 
     ServerError,
     InvalidRequestError,
     AccessDeniedError
   } from "@modelcontextprotocol/sdk/server/auth/errors.js";
 import dotenv from "dotenv";
+import { encryptionService } from "./encryptionService.js";
 
 dotenv.config();
 
+// Type definitions for in-memory stores
+interface SessionData {
+    state: string;
+    codeChallenge: string;
+    redirectUri: string;
+    clientId: string;
+    scopes: string[];
+}
+
+interface PendingAuthCode {
+    mcpAccessToken: string;
+    state: string;
+}
+
 export class SlackServerAuthProvider implements OAuthServerProvider {
+
     private _clients: Record<string, OAuthClientInformationFull> = {};
     private _clientsStore: OAuthRegisteredClientsStore;
-    
-    // Encryption key for tokens - should be 32 bytes for AES-256
-    private readonly _encryptionKey: Buffer;
-
     // Temporary in-memory store to map our MCP auth codes to MCP accesstokens and state
-    private _pendingAuthCodes = new Map<string, {
-        mcpAccessToken: string,
-        state: string
-    }>();
-    
+    private _pendingAuthCodes = new Map<string, PendingAuthCode>();
     // Temporary in-memory store to map out MCP access tokens to Auth user info
     private _accessTokenUserMap = new Map<string, AuthInfo>();
+    // Temporary in-memory store to map our state to session data
+    private _sessionStore = new Map<string, SessionData>();
 
-    private _sessionStore = new Map<string, {
-        state: string,
-        codeChallenge: string,
-        redirectUri: string,
-        clientId: string,
-        scopes: string[],
-    }>();
 
     constructor() {
-        // Initialize encryption key from environment variable or generate one
-        const key = process.env.TOKEN_ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
-        this._encryptionKey = Buffer.from(key, 'hex');
 
         this._clientsStore = {
             getClient: async (clientId: string) => {
@@ -131,28 +130,10 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
         };
     }
 
-    // Add helper methods for encryption/decryption
-    private encryptToken(token: string): string {
-        const iv = crypto.randomBytes(16);
-        const cipher = crypto.createCipheriv('aes-256-cbc', this._encryptionKey, iv);
-        let encrypted = cipher.update(token, 'utf8', 'hex');
-        encrypted += cipher.final('hex');
-        return iv.toString('hex') + ':' + encrypted;
-    }
-
-    private decryptToken(encryptedToken: string): string {
-        const [ivHex, encrypted] = encryptedToken.split(':');
-        const iv = Buffer.from(ivHex, 'hex');
-        const decipher = crypto.createDecipheriv('aes-256-cbc', this._encryptionKey, iv);
-        let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-        decrypted += decipher.final('utf8');
-        return decrypted;
-    }
-
     async verifyAccessToken(token: string): Promise<AuthInfo> {
         try {
             // Decrypt the token to get the Slack token
-            const slackToken = this.decryptToken(token);
+            const slackToken = encryptionService.decryptToken(token);
 
             const authInfo = this._accessTokenUserMap.get(token);
             if (!authInfo) {
@@ -192,7 +173,8 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
         formData.append('code', code);
         formData.append('client_id', process.env.SLACK_CLIENT_ID!);
         formData.append('client_secret', process.env.SLACK_CLIENT_SECRET!);
-        // formData.append('redirect_uri', 'https://localhost:8081/oauth/callback');
+
+        // TODO: change this to the actual redirect uri, used ngrok for testing in dev because slack requires https for redirect
         formData.append('redirect_uri', 'https://0f74-108-85-108-59.ngrok-free.app/oauth/callback');
 
         const response = await fetch('https://slack.com/api/oauth.v2.access', {
@@ -209,7 +191,7 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
         const mcpAuthCode = crypto.randomBytes(32).toString('hex');
         
         // Instead of generating random token, encrypt the Slack token
-        const mcpAccessToken = this.encryptToken(data.access_token);
+        const mcpAccessToken = encryptionService.encryptToken(data.access_token);
 
         // Store mappings
         this._pendingAuthCodes.set(mcpAuthCode, {
