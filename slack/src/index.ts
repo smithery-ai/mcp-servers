@@ -10,14 +10,13 @@ import { createStatefulServer } from "./stateful.js"
 import { z } from "zod"
 import { mcpAuthRouter } from "@modelcontextprotocol/sdk/server/auth/router.js"
 import { SlackServerAuthProvider } from "./provider.js"
-import express from 'express';
+import express, { RequestHandler } from 'express';
 import cors from "cors";
 import { encryptionService } from "./encryptionService.js"
 import { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js"
+import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js"
 
-// let boltApp: blot.App | null = null
 let slackClient: WebClient | null = null
-let mcpServer: McpServer;
 
 function setupResources(
 	config: {
@@ -27,8 +26,6 @@ function setupResources(
 	},
 	server: McpServer,
 ) {
-
-	console.log("in setupResources", config, server)
 
 	const app = new blot.App({
 		token: config.token,
@@ -122,14 +119,13 @@ function setupResources(
 
 async function initializeSlackClient(server: McpServer, token: string, signingSecret?: string, appToken?: string) {
 	if (slackClient) {
-		console.log("slack client already initialized", slackClient)
+		console.log("Sllack Client already initialized", slackClient)
 		return
 	}
 	slackClient = new WebClient(token)
 
 	const socketMode = !!appToken && !!signingSecret
 	if (socketMode) {
-		console.log("setting up resources", token, signingSecret, appToken, server)
 		setupResources({ token: token, signingSecret, appToken }, server)
 	}
 	return
@@ -137,8 +133,55 @@ async function initializeSlackClient(server: McpServer, token: string, signingSe
 
 const provider = new SlackServerAuthProvider
 
+// Create the main Express app first
+const app = express();
+app.use(express.json())
+
+// Add CORS middleware to main app BEFORE anything else
+app.use(cors({
+    origin: ['http://localhost:5173', 'http://127.0.0.1:6274'],
+    methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+        'Origin', 
+        'X-Requested-With', 
+        'Content-Type', 
+        'Accept', 
+        'Authorization',
+        'mcp-session-id',
+		'mcp-protocol-version'
+    ],
+    credentials: true
+}));
+
+app.use(mcpAuthRouter({
+	provider: provider,
+	// TODO: Change when deployed
+	issuerUrl: new URL("http://localhost:8081"),
+}))
+
+app.get("/oauth/callback", async(req, res) => {
+	const { code, state } = req.query;
+	if (!code || !state) {
+		res.status(400).send("Invalid request parameters");
+		return;
+	}
+
+	try {
+		const result = await provider.handleOAuthCallback(code as string, state as string);
+
+		console.log("Redirecting to:", result.redirectUrl, "with code:", result.mcpAuthCode)
+		res.redirect(`${result.redirectUrl}?code=${result.mcpAuthCode}`);
+	} catch (error) {
+		console.error("Error in callback handler:", error);
+		res.status(400).send("Server error during authentication callback");
+	}
+});
+
+app.use('/mcp', requireBearerAuth({ provider: provider }))
+
 // Create stateful server with Slack client configuration
-const { app } = createStatefulServer<{}>(
+createStatefulServer<{}>(
+	app,
 	({ config }) => {
 		try {
 			console.log("Starting Slack MCP Server...")
@@ -148,7 +191,7 @@ const { app } = createStatefulServer<{}>(
 				name: "Slack MCP Server",
 				version: "1.0.0",
 			})
-			mcpServer = server;
+		
 
 			function getSlackClient(extra: RequestHandlerExtra<ServerRequest, ServerNotification>): WebClient {
 				console.log("getting slack client", extra)
@@ -348,75 +391,11 @@ const { app } = createStatefulServer<{}>(
 			console.error(e)
 			throw e
 		}
-	}, 
-	{
-		provider: provider
 	}
 )
 
-
-// Create the main Express app first
-const mainApp = express();
-
-// Add CORS middleware to main app BEFORE anything else
-mainApp.use(cors({
-    origin: ['http://localhost:5173', 'http://127.0.0.1:6274'],
-    methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: [
-        'Origin', 
-        'X-Requested-With', 
-        'Content-Type', 
-        'Accept', 
-        'Authorization',
-        'mcp-session-id',
-		'mcp-protocol-version'
-    ],
-    credentials: true
-}));
-
-mainApp.use((req, res, next) => {
-    console.log("\n=== Request ===");
-	console.log("Original URL:", req.originalUrl);
-    console.log("Base URL:", req.baseUrl);
-    console.log("Path:", req.path);
-    console.log("Route:", req.route);
-    console.log("===================\n");
-    next();
-});
-
-
-mainApp.use(mcpAuthRouter({
-	provider: provider,
-	issuerUrl: new URL("http://localhost:8081"),
-}))
-
-
-// mainApp.use('/mcp', app)
-mainApp.use(app)
-
-
-mainApp.get("/oauth/callback", async(req, res) => {
-	const { code, state } = req.query;
-	if (!code || !state) {
-		res.status(400).send("Invalid request parameters");
-		return;
-	}
-
-	try {
-		const result = await provider.handleOAuthCallback(code as string, state as string);
-
-		console.log("Redirecting to:", result.redirectUrl, "with code:", result.mcpAuthCode)
-		res.redirect(`${result.redirectUrl}?code=${result.mcpAuthCode}`);
-	} catch (error) {
-		console.error("Error in callback handler:", error);
-		res.status(400).send("Server error during authentication callback");
-	}
-});
-
-
-
 // Start the server with mainApp
 const PORT = process.env.PORT || 8081;
-mainApp.listen(PORT, () => {
+app.listen(PORT, () => {
 	console.log(`MCP server running on port ${PORT}`);
 })

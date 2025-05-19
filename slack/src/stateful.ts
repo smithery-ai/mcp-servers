@@ -2,15 +2,12 @@ import { randomUUID } from "node:crypto"
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js"
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js"
 import express from "express"
-import { RequestHandler } from "express"
 
 import { parseExpressRequestConfig } from "@smithery/sdk/shared/config.js"
-import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js";
 
 
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js"
 import { type SessionStore, createLRUStore } from "@smithery/sdk/server/session.js"
-import { OAuthServerProvider } from "@modelcontextprotocol/sdk/server/auth/provider.js"
 
 
 /**
@@ -33,44 +30,22 @@ export interface StatefulServerOptions {
 	 * Session store to use for managing active sessions
 	 */
 	sessionStore?: SessionStore<StreamableHTTPServerTransport>
-    
-    /**
-     * OAuth server provider
-     */
-    provider?: OAuthServerProvider
 }
 
-function authVerificationMiddleware(): RequestHandler {
-    return async (req, res, next) => {
-        if (!req.auth) {
-            console.error("Auth middleware did not set auth");
-            throw new Error("Auth middleware did not set auth");
-        }
-        console.log("auth in authVerificationMiddleware", req.auth)
-        next();
-    }
-};
+
 
 /**
- * Creates a stateful server for handling MCP requests.
+ * Configures an Express application to include a stateful server for handling MCP requests.
  * For every new session, we invoke createMcpServer to create a new instance of the server.
+ * @param app Express application to configure
  * @param createMcpServer Function to create an MCP server
- * @returns Express app
+ * @param options Configuration options for the stateful server
  */
 export function createStatefulServer<T = Record<string, unknown>>(
+    app: express.Application,
 	createMcpServer: CreateServerFn<T>,
 	options?: StatefulServerOptions,
 ) {
-	const app = express()
-	app.use(express.json())
-
-    if (options?.provider) {
-        console.log("setting up oauth middleware in stateful server", options.provider)
-        app.use("/mcp", requireBearerAuth({ provider: options.provider }));
-
-         // Add verification middleware
-         app.use("/mcp", authVerificationMiddleware());
-    }
 
 	const sessionStore = options?.sessionStore ?? createLRUStore()
 	// Handle POST requests for client-to-server communication
@@ -175,6 +150,4 @@ export function createStatefulServer<T = Record<string, unknown>>(
 
 	// Handle DELETE requests for session termination
 	app.delete("/mcp", handleSessionRequest)
-
-	return { app }
 }
