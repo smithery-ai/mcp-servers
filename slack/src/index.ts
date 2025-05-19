@@ -8,6 +8,9 @@ import blot from "@slack/bolt"
 import { WebClient } from "@slack/web-api"
 import { createStatefulServer } from "@smithery/sdk/server/stateful.js"
 import { z } from "zod"
+import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js";
+import { mcpAuthRouter } from "@modelcontextprotocol/sdk/server/auth/router.js"
+import { SlackServerAuthProvider } from "./provider.js"
 
 function setupResources(
 	config: {
@@ -311,8 +314,39 @@ const { app } = createStatefulServer<{
 	}
 })
 
+const provider = new SlackServerAuthProvider
+
+app.use("/mcp", requireBearerAuth({
+	provider: provider
+}))
+
+app.use(mcpAuthRouter({
+	provider: provider,
+	issuerUrl: new URL("http://localhost:8081"),
+}))
+
+
+app.get("/oauth/callback", async(req, res) => {
+	const { code, state } = req.query;
+	if (!code || !state) {
+		res.status(400).send("Invalid request parameters");
+		return;
+	}
+
+	try {
+		const result = await provider.handleOAuthCallback(code as string, state as string);
+		console.log("Redirecting to:", result.redirectUrl, "with code:", result.mcpAuthCode)
+		res.redirect(`${result.redirectUrl}&code=${result.mcpAuthCode}`);
+	} catch (error) {
+		console.error("Error in callback handler:", error);
+		res.status(400).send("Server error during authentication callback");
+	}
+});
+
+
 // Start the server
 const PORT = process.env.PORT || 8081
+
 app.listen(PORT, () => {
 	console.log(`MCP server running on port ${PORT}`)
 })
