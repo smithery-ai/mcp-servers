@@ -82,7 +82,6 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
             const authParams = new URLSearchParams({
                 client_id: process.env.SLACK_CLIENT_ID!,
                 scope: 'app_mentions:read,assistant:write,channels:read,chat:write,chat:write.public,im:history,im:write,reactions:read,reactions:write,channels:history,groups:read,groups:history,im:read,mpim:read,mpim:history,users:read,users.profile:read',
-                // scope: 'app_mentions:read,channels:read,channels:history,groups:read,groups:history,im:read,im:history,mpim:read,mpim:history,chat:write,chat:write.public,reactions:write,users:read,users.profile:read',
                 // redirect_uri: 'https://localhost:8081/oauth/callback',
                 redirect_uri: 'https://0f74-108-85-108-59.ngrok-free.app/oauth/callback',
                 state
@@ -144,7 +143,7 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
             const client = new WebClient(slackToken);
             const auth = await client.auth.test();
 
-            console.log("auth in verifyAccessToken", auth);
+            console.log("authInfo in verifyAccessToken", authInfo);
 
             if (!auth.ok) {
                 throw new InvalidTokenError("Invalid token");

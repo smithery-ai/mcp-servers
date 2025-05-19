@@ -3,17 +3,21 @@ import {
 	McpServer,
 	ResourceTemplate,
 } from "@modelcontextprotocol/sdk/server/mcp.js"
-import { SubscribeRequestSchema } from "@modelcontextprotocol/sdk/types.js"
+import { ServerNotification, ServerRequest, SubscribeRequestSchema } from "@modelcontextprotocol/sdk/types.js"
 import blot from "@slack/bolt"
 import { WebClient } from "@slack/web-api"
-import { createStatefulServer } from "@smithery/sdk/server/stateful.js"
+import { createStatefulServer } from "./stateful.js"
 import { z } from "zod"
-import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js";
 import { mcpAuthRouter } from "@modelcontextprotocol/sdk/server/auth/router.js"
 import { SlackServerAuthProvider } from "./provider.js"
 import express from 'express';
 import cors from "cors";
 import { encryptionService } from "./encryptionService.js"
+import { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js"
+
+// let boltApp: blot.App | null = null
+let slackClient: WebClient | null = null
+let mcpServer: McpServer;
 
 function setupResources(
 	config: {
@@ -23,6 +27,9 @@ function setupResources(
 	},
 	server: McpServer,
 ) {
+
+	console.log("in setupResources", config, server)
+
 	const app = new blot.App({
 		token: config.token,
 		signingSecret: config.signingSecret,
@@ -33,6 +40,7 @@ function setupResources(
 		await app.start()
 		console.log("⚡️ Bolt app started")
 	})()
+	
 
 	server.server.onclose = () => {
 		app.stop()
@@ -112,6 +120,241 @@ function setupResources(
 	)
 }
 
+async function initializeSlackClient(server: McpServer, token: string, signingSecret?: string, appToken?: string) {
+	if (slackClient) {
+		console.log("slack client already initialized", slackClient)
+		return
+	}
+	slackClient = new WebClient(token)
+
+	const socketMode = !!appToken && !!signingSecret
+	if (socketMode) {
+		console.log("setting up resources", token, signingSecret, appToken, server)
+		setupResources({ token: token, signingSecret, appToken }, server)
+	}
+	return
+}
+
+const provider = new SlackServerAuthProvider
+
+// Create stateful server with Slack client configuration
+const { app } = createStatefulServer<{}>(
+	({ config }) => {
+		try {
+			console.log("Starting Slack MCP Server...")
+
+			// Create a new MCP server with the higher-level API
+			const server = new McpServer({
+				name: "Slack MCP Server",
+				version: "1.0.0",
+			})
+			mcpServer = server;
+
+			function getSlackClient(extra: RequestHandlerExtra<ServerRequest, ServerNotification>): WebClient {
+				console.log("getting slack client", extra)
+				if (!slackClient) {
+					const mcpToken = extra.authInfo?.token;
+					if (!mcpToken) {
+						throw new Error("No token found in auth info");
+					}
+					const slackToken  = encryptionService.decryptToken(mcpToken);
+					if (!slackToken) {
+						throw new Error("Failed to decrypt token");
+					}
+					console.log("initializing slack client", slackToken)
+					initializeSlackClient(server, slackToken, process.env.SLACK_SIGNING_SECRET, process.env.SLACK_APP_TOKEN);
+				}
+				console.log("returning slack client", slackClient)
+				return slackClient!;
+			}
+			
+
+			// List channels tool
+			server.tool(
+				"slack_list_channels",
+				"List public or pre-defined channels in the workspace with pagination",
+				{
+					limit: z
+						.number()
+						.optional()
+						.default(100)
+						.describe(
+							"Maximum number of channels to return (default 100, max 200)",
+						),
+					cursor: z
+						.string()
+						.optional()
+						.describe("Pagination cursor for next page of results"),
+				},
+				async ( args, extra ) => {
+					const response = await getSlackClient(extra).conversations.list({
+						limit: args.limit,
+						cursor: args.cursor,
+					})
+					return {
+						content: [{ type: "text", text: JSON.stringify(response) }],
+					}
+				},
+			)
+
+			// Post message tool (with optional thread reply capability)
+			server.tool(
+				"slack_post_message",
+				"Post a new message to a Slack channel or reply to a thread",
+				{
+					channel_id: z.string().describe("The ID of the channel to post to"),
+					text: z.string().describe("The message text to post"),
+					thread_ts: z
+						.string()
+						.optional()
+						.describe(
+							"Optional. The timestamp of the parent message to reply to in the format '1234567890.123456'. When provided, the message will be posted as a reply to the thread.",
+						),
+				},
+				async ( args, extra) => {
+					const response = await getSlackClient(extra).chat.postMessage({
+						channel: args.channel_id,
+						// @ts-ignore
+						blocks: [{ type: "markdown", text: args.text }],
+						...(args.thread_ts && { thread_ts: args.thread_ts }),
+						mrkdwn: true,
+					})
+					return {
+						content: [{ type: "text", text: JSON.stringify(response) }],
+					}
+				},
+			)
+
+			// Add reaction tool
+			server.tool(
+				"slack_add_reaction",
+				"Add a reaction emoji to a message",
+				{
+					channel_id: z
+						.string()
+						.describe("The ID of the channel containing the message"),
+					timestamp: z
+						.string()
+						.describe("The timestamp of the message to react to"),
+					reaction: z
+						.string()
+						.describe("The name of the emoji reaction (without ::)"),
+				},
+				async ( args, extra) => {
+					const response = await getSlackClient(extra).reactions.add({
+						channel: args.channel_id,
+						timestamp: args.timestamp,
+						name: args.reaction,
+					})
+					return {
+						content: [{ type: "text", text: JSON.stringify(response) }],
+					}
+				},
+			)
+
+			// Get channel history tool
+			server.tool(
+				"slack_get_channel_history",
+				"Get recent messages from a channel",
+				{
+					channel_id: z.string().describe("The ID of the channel"),
+					limit: z
+						.number()
+						.optional()
+						.default(10)
+						.describe("Number of messages to retrieve (default 10)"),
+				},
+				async ( args, extra) => {
+					const response = await getSlackClient(extra).conversations.history({
+						channel: args.channel_id,
+						limit: args.limit,
+					})
+					return {
+						content: [{ type: "text", text: JSON.stringify(response) }],
+					}
+				},
+			)
+
+			// Get thread replies tool
+			server.tool(
+				"slack_get_thread_replies",
+				"Get all replies in a message thread",
+				{
+					channel_id: z
+						.string()
+						.describe("The ID of the channel containing the thread"),
+					thread_ts: z
+						.string()
+						.describe(
+							"The timestamp of the parent message in the format '1234567890.123456'. Timestamps in the format without the period can be converted by adding the period such that 6 numbers come after it.",
+						),
+				},
+				async ( args, extra) => {
+					const response = await getSlackClient(extra).conversations.replies({
+						channel: args.channel_id,
+						ts: args.thread_ts, // Note: Slack API uses 'ts' not 'thread_ts' for the replies method
+					})
+					return {
+						content: [{ type: "text", text: JSON.stringify(response) }],
+					}
+				},
+			)
+
+			// Get users tool
+			server.tool(
+				"slack_get_users",
+				"Get a list of all users in the workspace with their basic profile information",
+				{
+					cursor: z
+						.string()
+						.optional()
+						.describe("Pagination cursor for next page of results"),
+					limit: z
+						.number()
+						.optional()
+						.default(100)
+						.describe("Maximum number of users to return (default 100, max 200)"),
+				},
+				async ( args, extra) => {
+					const response = await getSlackClient(extra).users.list({
+						limit: args.limit,
+						cursor: args.cursor,
+					})
+					return {
+						content: [{ type: "text", text: JSON.stringify(response) }],
+					}
+				},
+			)
+
+			// Get user profile tool
+			server.tool(
+				"slack_get_user_profile",
+				"Get detailed profile information for a specific user",
+				{
+					user_id: z.string().describe("The ID of the user"),
+				},
+				async ( args, extra) => {
+					const response = await getSlackClient(extra).users.profile.get({
+						user: args.user_id,
+					})
+					return {
+						content: [{ type: "text", text: JSON.stringify(response) }],
+					}
+				},
+			)
+
+			return server.server
+		} catch (e) {
+			console.error(e)
+			throw e
+		}
+	}, 
+	{
+		provider: provider
+	}
+)
+
+
 // Create the main Express app first
 const mainApp = express();
 
@@ -131,243 +374,26 @@ mainApp.use(cors({
     credentials: true
 }));
 
-// Create stateful server with Slack client configuration
-const { app } = createStatefulServer<{}>(({ config }) => {
-	try {
-		console.log("Starting Slack MCP Server...")
+mainApp.use((req, res, next) => {
+    console.log("\n=== Request ===");
+	console.log("Original URL:", req.originalUrl);
+    console.log("Base URL:", req.baseUrl);
+    console.log("Path:", req.path);
+    console.log("Route:", req.route);
+    console.log("===================\n");
+    next();
+});
 
-		let slackToken: string | null = null
-
-		// Create a new MCP server with the higher-level API
-		const server = new McpServer({
-			name: "Slack MCP Server",
-			version: "1.0.0",
-		})
-
-		// Create single WebClient instance with the token
-		app.use((req, res, next) => {
-			if (!slackToken) {
-			  const mcpToken = req.auth?.token
-			  if (!mcpToken) {
-				res.status(401).json({ error: "MCP token not found in request" })
-				return
-			  }
-			  console.log("mcpToken", mcpToken)
-			  slackToken = encryptionService.decryptToken(mcpToken)
-			  console.log("slackToken", slackToken)
-			}
-			next()
-		})
-
-		if (!slackToken) {
-			throw new Error("Slack token not found")
-		}
-
-		// Initialize the Slack client
-		const slackClient = new WebClient(slackToken)
-
-		// Get config from environment variables
-		const signingSecret = process.env.SLACK_SIGNING_SECRET
-		const appToken = process.env.SLACK_APP_TOKEN
-		const socketMode = !!appToken && !!signingSecret
-
-		if (socketMode) {
-			setupResources({ token: slackToken, signingSecret, appToken }, server)
-		}
-
-		// List channels tool
-		server.tool(
-			"slack_list_channels",
-			"List public or pre-defined channels in the workspace with pagination",
-			{
-				limit: z
-					.number()
-					.optional()
-					.default(100)
-					.describe(
-						"Maximum number of channels to return (default 100, max 200)",
-					),
-				cursor: z
-					.string()
-					.optional()
-					.describe("Pagination cursor for next page of results"),
-			},
-			async ({ limit, cursor }: { limit: number; cursor?: string }) => {
-				const response = await slackClient.conversations.list({
-					limit,
-					cursor,
-				})
-				return {
-					content: [{ type: "text", text: JSON.stringify(response) }],
-				}
-			},
-		)
-
-		// Post message tool (with optional thread reply capability)
-		server.tool(
-			"slack_post_message",
-			"Post a new message to a Slack channel or reply to a thread",
-			{
-				channel_id: z.string().describe("The ID of the channel to post to"),
-				text: z.string().describe("The message text to post"),
-				thread_ts: z
-					.string()
-					.optional()
-					.describe(
-						"Optional. The timestamp of the parent message to reply to in the format '1234567890.123456'. When provided, the message will be posted as a reply to the thread.",
-					),
-			},
-			async ({ channel_id, text, thread_ts }) => {
-				const response = await slackClient.chat.postMessage({
-					channel: channel_id,
-					// @ts-ignore
-					blocks: [{ type: "markdown", text }],
-					...(thread_ts && { thread_ts }),
-					mrkdwn: true,
-				})
-				return {
-					content: [{ type: "text", text: JSON.stringify(response) }],
-				}
-			},
-		)
-
-		// Add reaction tool
-		server.tool(
-			"slack_add_reaction",
-			"Add a reaction emoji to a message",
-			{
-				channel_id: z
-					.string()
-					.describe("The ID of the channel containing the message"),
-				timestamp: z
-					.string()
-					.describe("The timestamp of the message to react to"),
-				reaction: z
-					.string()
-					.describe("The name of the emoji reaction (without ::)"),
-			},
-			async ({ channel_id, timestamp, reaction }) => {
-				const response = await slackClient.reactions.add({
-					channel: channel_id,
-					timestamp,
-					name: reaction,
-				})
-				return {
-					content: [{ type: "text", text: JSON.stringify(response) }],
-				}
-			},
-		)
-
-		// Get channel history tool
-		server.tool(
-			"slack_get_channel_history",
-			"Get recent messages from a channel",
-			{
-				channel_id: z.string().describe("The ID of the channel"),
-				limit: z
-					.number()
-					.optional()
-					.default(10)
-					.describe("Number of messages to retrieve (default 10)"),
-			},
-			async ({ channel_id, limit }) => {
-				const response = await slackClient.conversations.history({
-					channel: channel_id,
-					limit,
-				})
-				return {
-					content: [{ type: "text", text: JSON.stringify(response) }],
-				}
-			},
-		)
-
-		// Get thread replies tool
-		server.tool(
-			"slack_get_thread_replies",
-			"Get all replies in a message thread",
-			{
-				channel_id: z
-					.string()
-					.describe("The ID of the channel containing the thread"),
-				thread_ts: z
-					.string()
-					.describe(
-						"The timestamp of the parent message in the format '1234567890.123456'. Timestamps in the format without the period can be converted by adding the period such that 6 numbers come after it.",
-					),
-			},
-			async ({ channel_id, thread_ts }) => {
-				const response = await slackClient.conversations.replies({
-					channel: channel_id,
-					ts: thread_ts, // Note: Slack API uses 'ts' not 'thread_ts' for the replies method
-				})
-				return {
-					content: [{ type: "text", text: JSON.stringify(response) }],
-				}
-			},
-		)
-
-		// Get users tool
-		server.tool(
-			"slack_get_users",
-			"Get a list of all users in the workspace with their basic profile information",
-			{
-				cursor: z
-					.string()
-					.optional()
-					.describe("Pagination cursor for next page of results"),
-				limit: z
-					.number()
-					.optional()
-					.default(100)
-					.describe("Maximum number of users to return (default 100, max 200)"),
-			},
-			async ({ limit, cursor }) => {
-				const response = await slackClient.users.list({
-					limit,
-					cursor,
-				})
-				return {
-					content: [{ type: "text", text: JSON.stringify(response) }],
-				}
-			},
-		)
-
-		// Get user profile tool
-		server.tool(
-			"slack_get_user_profile",
-			"Get detailed profile information for a specific user",
-			{
-				user_id: z.string().describe("The ID of the user"),
-			},
-			async ({ user_id }) => {
-				const response = await slackClient.users.profile.get({
-					user: user_id,
-				})
-				return {
-					content: [{ type: "text", text: JSON.stringify(response) }],
-				}
-			},
-		)
-
-		return server.server
-	} catch (e) {
-		console.error(e)
-		throw e
-	}
-})
-
-mainApp.use(app)
-
-const provider = new SlackServerAuthProvider
 
 mainApp.use(mcpAuthRouter({
 	provider: provider,
 	issuerUrl: new URL("http://localhost:8081"),
 }))
 
-mainApp.use("/mcp", requireBearerAuth({
-	provider: provider
-}), app)
+
+// mainApp.use('/mcp', app)
+mainApp.use(app)
+
 
 mainApp.get("/oauth/callback", async(req, res) => {
 	const { code, state } = req.query;
@@ -378,6 +404,7 @@ mainApp.get("/oauth/callback", async(req, res) => {
 
 	try {
 		const result = await provider.handleOAuthCallback(code as string, state as string);
+
 		console.log("Redirecting to:", result.redirectUrl, "with code:", result.mcpAuthCode)
 		res.redirect(`${result.redirectUrl}?code=${result.mcpAuthCode}`);
 	} catch (error) {
@@ -385,6 +412,8 @@ mainApp.get("/oauth/callback", async(req, res) => {
 		res.status(400).send("Server error during authentication callback");
 	}
 });
+
+
 
 // Start the server with mainApp
 const PORT = process.env.PORT || 8081;
