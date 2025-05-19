@@ -33,7 +33,6 @@ export interface StatefulServerOptions {
 }
 
 
-
 /**
  * Configures an Express application to include a stateful server for handling MCP requests.
  * For every new session, we invoke createMcpServer to create a new instance of the server.

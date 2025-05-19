@@ -136,19 +136,18 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
 
             const authInfo = this._accessTokenUserMap.get(token);
             if (!authInfo) {
-                throw new InvalidTokenError("Invalid token");
+                throw new InvalidTokenError("Invalid MCP Access Token");
             }
 
             // Verify with Slack API
             const client = new WebClient(slackToken);
             const auth = await client.auth.test();
 
-            console.log("authInfo in verifyAccessToken", authInfo);
-
             if (!auth.ok) {
-                throw new InvalidTokenError("Invalid token");
+                throw new InvalidTokenError("Invalid Slack Access Token");
             }
             
+            console.log("authInfo in verifyAccessToken", authInfo);
             return authInfo;
         } catch (error) {
             this._accessTokenUserMap.delete(token);

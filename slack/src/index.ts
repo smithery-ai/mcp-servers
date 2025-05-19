@@ -117,9 +117,9 @@ function setupResources(
 	)
 }
 
-async function initializeSlackClient(server: McpServer, token: string, signingSecret?: string, appToken?: string) {
+function initializeSlackClient(server: McpServer, token: string, signingSecret?: string, appToken?: string) {
 	if (slackClient) {
-		console.log("Sllack Client already initialized", slackClient)
+		console.log("Slack Client already initialized", slackClient)
 		return
 	}
 	slackClient = new WebClient(token)
@@ -194,7 +194,6 @@ createStatefulServer<{}>(
 		
 
 			function getSlackClient(extra: RequestHandlerExtra<ServerRequest, ServerNotification>): WebClient {
-				console.log("getting slack client", extra)
 				if (!slackClient) {
 					const mcpToken = extra.authInfo?.token;
 					if (!mcpToken) {
@@ -204,10 +203,10 @@ createStatefulServer<{}>(
 					if (!slackToken) {
 						throw new Error("Failed to decrypt token");
 					}
-					console.log("initializing slack client", slackToken)
+					console.log("Initializing Slack Client", slackToken)
 					initializeSlackClient(server, slackToken, process.env.SLACK_SIGNING_SECRET, process.env.SLACK_APP_TOKEN);
 				}
-				console.log("returning slack client", slackClient)
+		
 				return slackClient!;
 			}
 			
