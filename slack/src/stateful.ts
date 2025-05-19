@@ -1,9 +1,8 @@
 import { randomUUID } from "node:crypto"
-import { StreamableHTTPServerTransport } from "./streamableHttp.js"
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js"
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js"
 import express from "express"
 import { RequestHandler } from "express"
-import { ParamsDictionary } from 'express-serve-static-core';
 
 import { parseExpressRequestConfig } from "@smithery/sdk/shared/config.js"
 import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js";
