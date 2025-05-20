@@ -54,6 +54,7 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
             registerClient: async (client: OAuthClientInformationFull) => {
                 console.log("in register client", client);
                 this._clients[client.client_id] = client;
+                console.log("this._clients", this._clients);
                 return client;
             }
         };

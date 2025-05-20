@@ -1,5 +1,5 @@
 startCommand:
   type: http
-    configSchema:
+  configSchema:
     type: object
-    properties: {}  # Empty properties object
+    description: Empty object
