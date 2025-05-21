@@ -58,6 +58,9 @@ export function createStatefulServer<T = Record<string, unknown>>(
 			// biome-ignore lint/style/noNonNullAssertion: Not possible
 			transport = sessionStore.get(sessionId)!
 		} else if (!sessionId && isInitializeRequest(req.body)) {
+
+            console.log("new initialization request", req.body);
+
 			// New initialization request
 			const newSessionId = randomUUID()
 			transport = new StreamableHTTPServerTransport({
@@ -79,6 +82,7 @@ export function createStatefulServer<T = Record<string, unknown>>(
 			try {
 				config = parseExpressRequestConfig(req)
 			} catch (error) {
+                console.log("error parsing config", error);
 				res.status(400).json({
 					jsonrpc: "2.0",
 					error: {
@@ -97,6 +101,7 @@ export function createStatefulServer<T = Record<string, unknown>>(
 
 				// Connect to the MCP server
 				await server.connect(transport)
+
 			} catch (error) {
 				console.error("Error initializing server:", error)
 				res.status(500).json({

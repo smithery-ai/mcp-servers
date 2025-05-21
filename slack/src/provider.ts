@@ -33,11 +33,12 @@ interface PendingAuthCode {
 export class SlackServerAuthProvider implements OAuthServerProvider {
 
     private _clients: Record<string, OAuthClientInformationFull> = {};
+    
     private _clientsStore: OAuthRegisteredClientsStore;
+
     // Temporary in-memory store to map our MCP auth codes to MCP accesstokens and state
     private _pendingAuthCodes = new Map<string, PendingAuthCode>();
-    // Temporary in-memory store to map out MCP access tokens to Auth user info
-    private _accessTokenUserMap = new Map<string, AuthInfo>();
+
     // Temporary in-memory store to map our state to session data
     private _sessionStore = new Map<string, SessionData>();
 
@@ -46,17 +47,15 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
 
         this._clientsStore = {
             getClient: async (clientId: string) => {
-                console.log("in get client", clientId);
-                console.log("this._clients", this._clients);
-                return this._clients[clientId];
+                // console.log("in get client", clientId);
+                // console.log("this._clients", this._clients);
+                // return this._clients[clientId];
+                return {
+                    client_id: process.env.SLACK_CLIENT_ID!,
+                    redirect_uris: [process.env.SERVER_REDIRECT_URI!]
+                }
             },
 
-            registerClient: async (client: OAuthClientInformationFull) => {
-                console.log("in register client", client);
-                this._clients[client.client_id] = client;
-                console.log("this._clients", this._clients);
-                return client;
-            }
         };
     }
 
@@ -83,8 +82,7 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
             const authParams = new URLSearchParams({
                 client_id: process.env.SLACK_CLIENT_ID!,
                 scope: 'app_mentions:read,assistant:write,channels:read,chat:write,chat:write.public,im:history,im:write,reactions:read,reactions:write,channels:history,groups:read,groups:history,im:read,mpim:read,mpim:history,users:read,users.profile:read',
-                // redirect_uri: 'https://localhost:8081/oauth/callback',
-                redirect_uri: 'https://0f74-108-85-108-59.ngrok-free.app/oauth/callback',
+                redirect_uri: process.env.SLACK_REDIRECT_URI!,
                 state
             });
 
@@ -132,10 +130,17 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
 
     async verifyAccessToken(token: string): Promise<AuthInfo> {
         try {
+            console.log("in verifyAccessToken", token);
             // Decrypt the token to get the Slack token
             const slackToken = encryptionService.decryptToken(token);
+            console.log("slackToken in verifyAccessToken", slackToken);
 
-            const authInfo = this._accessTokenUserMap.get(token);
+            const authInfo = {
+                token: token,
+                clientId: process.env.SLACK_CLIENT_ID!,
+                scopes: []
+            }
+
             if (!authInfo) {
                 throw new InvalidTokenError("Invalid MCP Access Token");
             }
@@ -151,7 +156,7 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
             console.log("authInfo in verifyAccessToken", authInfo);
             return authInfo;
         } catch (error) {
-            this._accessTokenUserMap.delete(token);
+            // this._accessTokenUserMap.delete(token);
             throw new InvalidTokenError("Invalid token");
         }
     }
@@ -174,7 +179,7 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
         formData.append('client_secret', process.env.SLACK_CLIENT_SECRET!);
 
         // TODO: change this to the actual redirect uri, used ngrok for testing in dev because slack requires https for redirect
-        formData.append('redirect_uri', 'https://0f74-108-85-108-59.ngrok-free.app/oauth/callback');
+        formData.append('redirect_uri', process.env.SLACK_REDIRECT_URI!);
 
         const response = await fetch('https://slack.com/api/oauth.v2.access', {
             method: 'POST',
@@ -198,11 +203,11 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
             state
         });
         
-        this._accessTokenUserMap.set(mcpAccessToken, {
-            token: mcpAccessToken,
-            clientId: sessionData.clientId,
-            scopes: sessionData.scopes
-        });
+        // this._accessTokenUserMap.set(mcpAccessToken, {
+        //     token: mcpAccessToken,
+        //     clientId: sessionData.clientId,
+        //     scopes: sessionData.scopes
+        // });
 
         return { mcpAuthCode, redirectUrl: sessionData.redirectUri };
     }

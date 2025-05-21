@@ -14,7 +14,8 @@ import express, { RequestHandler } from 'express';
 import cors from "cors";
 import { encryptionService } from "./encryptionService.js"
 import { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js"
-import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js"
+// import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js"
+import { requireBearerAuth } from "./bearerAuth.js"
 
 let slackClient: WebClient | null = null
 
@@ -139,7 +140,7 @@ app.use(express.json())
 
 // Add CORS middleware to main app BEFORE anything else
 app.use(cors({
-    origin: ['http://localhost:5173', 'http://127.0.0.1:6274'],
+    origin: ['http://localhost:5173', 'http://127.0.0.1:6274', 'http://localhost:3000'],
     methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
         'Origin', 
@@ -152,6 +153,24 @@ app.use(cors({
     ],
     credentials: true
 }));
+
+// log all requests
+app.use((req, res, next) => {
+	console.log('\n=== Incoming Request ===');
+    console.log('Time:', new Date().toISOString());
+    console.log('Method:', req.method);
+    console.log('URL:', req.url);
+    console.log('Headers:', JSON.stringify(req.headers, null, 2));
+    
+    if (req.body) {
+        console.log('Body:', JSON.stringify(req.body, null, 2));
+    }
+    
+    console.log('Query:', JSON.stringify(req.query, null, 2));
+    console.log('Params:', JSON.stringify(req.params, null, 2));
+    console.log('=====================\n');
+	next();
+});
 
 app.use(mcpAuthRouter({
 	provider: provider,
