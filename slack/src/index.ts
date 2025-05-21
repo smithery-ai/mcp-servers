@@ -8,9 +8,10 @@ import blot from "@slack/bolt"
 import { WebClient } from "@slack/web-api"
 import { createStatefulServer } from "./stateful.js"
 import { z } from "zod"
-import { mcpAuthRouter } from "@modelcontextprotocol/sdk/server/auth/router.js"
+// import { mcpAuthRouter } from "@modelcontextprotocol/sdk/server/auth/router.js"
+import { mcpAuthRouter } from "./router.js"
 import { SlackServerAuthProvider } from "./provider.js"
-import express, { RequestHandler } from 'express';
+import express from 'express';
 import cors from "cors";
 import { encryptionService } from "./encryptionService.js"
 import { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js"
