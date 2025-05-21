@@ -51,18 +51,22 @@ export function createStatefulServer<T = Record<string, unknown>>(
 	app.post("/mcp", async (req, res) => {
 		// Check for existing session ID
 		const sessionId = req.headers["mcp-session-id"] as string | undefined
+        console.log("sessionId", sessionId);
 		let transport: StreamableHTTPServerTransport
 
 		if (sessionId && sessionStore.get(sessionId)) {
 			// Reuse existing transport
 			// biome-ignore lint/style/noNonNullAssertion: Not possible
+            console.log("reusing existing transport", sessionStore.get(sessionId));
 			transport = sessionStore.get(sessionId)!
+            console.log("transport", transport);
 		} else if (!sessionId && isInitializeRequest(req.body)) {
 
             console.log("new initialization request", req.body);
 
 			// New initialization request
 			const newSessionId = randomUUID()
+            console.log("newSessionId for transport created in initialize request", newSessionId);
 			transport = new StreamableHTTPServerTransport({
 				sessionIdGenerator: () => newSessionId,
 				onsessioninitialized: (sessionId) => {
@@ -81,6 +85,7 @@ export function createStatefulServer<T = Record<string, unknown>>(
 			let config: ReturnType<typeof parseExpressRequestConfig>
 			try {
 				config = parseExpressRequestConfig(req)
+
 			} catch (error) {
                 console.log("error parsing config", error);
 				res.status(400).json({

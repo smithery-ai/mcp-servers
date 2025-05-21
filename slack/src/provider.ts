@@ -47,12 +47,9 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
 
         this._clientsStore = {
             getClient: async (clientId: string) => {
-                // console.log("in get client", clientId);
-                // console.log("this._clients", this._clients);
-                // return this._clients[clientId];
                 return {
                     client_id: process.env.SLACK_CLIENT_ID!,
-                    redirect_uris: [process.env.SERVER_REDIRECT_URI!]
+                    redirect_uris: [process.env.CLIENT_REDIRECT_URI!]
                 }
             },
 

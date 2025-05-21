@@ -151,26 +151,9 @@ app.use(cors({
         'mcp-session-id',
 		'mcp-protocol-version'
     ],
+	exposedHeaders: ["mcp-session-id"],
     credentials: true
 }));
-
-// log all requests
-app.use((req, res, next) => {
-	console.log('\n=== Incoming Request ===');
-    console.log('Time:', new Date().toISOString());
-    console.log('Method:', req.method);
-    console.log('URL:', req.url);
-    console.log('Headers:', JSON.stringify(req.headers, null, 2));
-    
-    if (req.body) {
-        console.log('Body:', JSON.stringify(req.body, null, 2));
-    }
-    
-    console.log('Query:', JSON.stringify(req.query, null, 2));
-    console.log('Params:', JSON.stringify(req.params, null, 2));
-    console.log('=====================\n');
-	next();
-});
 
 app.use(mcpAuthRouter({
 	provider: provider,
