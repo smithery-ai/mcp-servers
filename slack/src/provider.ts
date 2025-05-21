@@ -83,7 +83,7 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
                 state
             });
 
-            console.log("Redirecting to:", slackAuthUrl, "with params:", authParams);
+            console.log("Redirecting to:", slackAuthUrl);
 
             res.redirect(`${slackAuthUrl}?${authParams}`);
         } catch (error) {

@@ -14,8 +14,8 @@ import express, { RequestHandler } from 'express';
 import cors from "cors";
 import { encryptionService } from "./encryptionService.js"
 import { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js"
-// import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js"
-import { requireBearerAuth } from "./bearerAuth.js"
+import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js"
+// import { requireBearerAuth } from "./bearerAuth.js"
 
 let slackClient: WebClient | null = null
 
@@ -140,6 +140,7 @@ app.use(express.json())
 
 // Add CORS middleware to main app BEFORE anything else
 app.use(cors({
+	//  add smithery url ?
     origin: ['http://localhost:5173', 'http://127.0.0.1:6274', 'http://localhost:3000'],
     methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
@@ -157,8 +158,8 @@ app.use(cors({
 
 app.use(mcpAuthRouter({
 	provider: provider,
-	// TODO: Change when deployed
-	issuerUrl: new URL("http://localhost:8081"),
+	// TODO: Change when deployed to smithery url
+	issuerUrl: new URL(process.env.SERVER_BASE_URL!),
 }))
 
 app.get("/oauth/callback", async(req, res) => {
