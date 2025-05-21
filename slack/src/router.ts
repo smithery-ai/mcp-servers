@@ -96,7 +96,7 @@ export function mcpAuthRouter(options: AuthRouterOptions): RequestHandler {
     tokenHandler({ provider: options.provider, ...options.tokenOptions })
   );
 
-  router.use("/.well-known/oauth-authorization-server", metadataHandler(metadata));
+  router.use("/raw/.well-known/oauth-authorization-server", metadataHandler(metadata));
 
   if (registration_endpoint) {
     router.use(

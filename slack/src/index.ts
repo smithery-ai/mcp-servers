@@ -163,7 +163,7 @@ app.use(mcpAuthRouter({
 	issuerUrl: new URL(process.env.SERVER_BASE_URL!),
 }))
 
-app.get("/oauth/callback", async(req, res) => {
+app.get("/raw/oauth/callback", async(req, res) => {
 	const { code, state } = req.query;
 	if (!code || !state) {
 		res.status(400).send("Invalid request parameters");
