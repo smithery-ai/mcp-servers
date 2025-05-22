@@ -8,8 +8,8 @@ import blot from "@slack/bolt"
 import { WebClient } from "@slack/web-api"
 import { createStatefulServer } from "./stateful.js"
 import { z } from "zod"
-// import { mcpAuthRouter } from "@modelcontextprotocol/sdk/server/auth/router.js"
-import { mcpAuthRouter } from "./router.js"
+import { mcpAuthRouter } from "@modelcontextprotocol/sdk/server/auth/router.js"
+// import { mcpAuthRouter } from "./router.js"
 import { SlackServerAuthProvider } from "./provider.js"
 import express from 'express';
 import cors from "cors";
@@ -139,10 +139,19 @@ const provider = new SlackServerAuthProvider
 const app = express();
 app.use(express.json())
 
+// log all requests including method header body 
+app.use((req, res, next) => {
+	console.log(`${req.method} ${req.url}`);
+	console.log('headers', req.headers);
+	console.log('body', req.body);
+	next();
+});
+
 // Add CORS middleware to main app BEFORE anything else
 app.use(cors({
 	//  add smithery url ?
-    origin: ['http://localhost:5173', 'http://127.0.0.1:6274', 'http://localhost:3000'],
+    origin: ['http://localhost:5173', 'http://127.0.0.1:6274', 'http://localhost:3000', 'http://localhost:8081'],
+	// origin: '*',
     methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
         'Origin', 
@@ -157,13 +166,19 @@ app.use(cors({
     credentials: true
 }));
 
+// log all requests
+app.use((req, res, next) => {
+	console.log(`${req.method} ${req.url}`);
+	next();
+});
+
 app.use(mcpAuthRouter({
 	provider: provider,
 	// TODO: Change when deployed to smithery url
 	issuerUrl: new URL(process.env.SERVER_BASE_URL!),
 }))
 
-app.get("/raw/oauth/callback", async(req, res) => {
+app.get("/oauth/callback", async(req, res) => {
 	const { code, state } = req.query;
 	if (!code || !state) {
 		res.status(400).send("Invalid request parameters");
@@ -398,7 +413,7 @@ createStatefulServer<{}>(
 )
 
 // Start the server with mainApp
-const PORT = process.env.PORT || 8081;
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
 	console.log(`MCP server running on port ${PORT}`);
 })

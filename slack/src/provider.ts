@@ -111,8 +111,10 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
     }
 
     async exchangeAuthorizationCode(client: OAuthClientInformationFull, authorizationCode: string): Promise<OAuthTokens> {
+        console.log('exchangeAuthorizationCode', authorizationCode);
         const { mcpAccessToken } = this._pendingAuthCodes.get(authorizationCode) || {};
         if (!mcpAccessToken) {
+            console.log('no mcpAccessToken');
             throw new Error("Invalid authorization code");
         }
 
@@ -174,8 +176,6 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
         formData.append('code', code);
         formData.append('client_id', process.env.SLACK_CLIENT_ID!);
         formData.append('client_secret', process.env.SLACK_CLIENT_SECRET!);
-
-        // TODO: change this to the actual redirect uri, used ngrok for testing in dev because slack requires https for redirect
         formData.append('redirect_uri', process.env.SLACK_REDIRECT_URI!);
 
         const response = await fetch('https://slack.com/api/oauth.v2.access', {
@@ -184,6 +184,7 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
         });
 
         const data = await response.json();
+        console.log('data in handleOAuthCallback', data);
         if (!data.ok) {
             throw new Error("Failed to exchange code");
         }
@@ -199,12 +200,7 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
             mcpAccessToken,
             state
         });
-        
-        // this._accessTokenUserMap.set(mcpAccessToken, {
-        //     token: mcpAccessToken,
-        //     clientId: sessionData.clientId,
-        //     scopes: sessionData.scopes
-        // });
+        console.log("returning from handleOAuthCallback", mcpAuthCode, sessionData.redirectUri);
 
         return { mcpAuthCode, redirectUrl: sessionData.redirectUri };
     }
