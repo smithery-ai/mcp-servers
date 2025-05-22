@@ -32,8 +32,6 @@ interface PendingAuthCode {
 
 export class SlackServerAuthProvider implements OAuthServerProvider {
 
-    private _clients: Record<string, OAuthClientInformationFull> = {};
-    
     private _clientsStore: OAuthRegisteredClientsStore;
 
     // Temporary in-memory store to map our MCP auth codes to MCP accesstokens and state
@@ -45,6 +43,9 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
 
     constructor() {
 
+        // This is a hardcoded client store using the Smithery client id and redirect uri
+        // We do not support dynamic client registration. 
+        // The web client that connects to initiate auth flow is configured to use this client id and redirect uri
         this._clientsStore = {
             getClient: async (clientId: string) => {
                 return {
@@ -97,7 +98,6 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
         if (!state) {
             throw new Error("Invalid authorization code");
         }
-        // log the state and the code challenge
         const codeChallenge = this._sessionStore.get(state)?.codeChallenge || '';
         this._sessionStore.delete(state);
         return codeChallenge;
@@ -121,7 +121,6 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
         try {
             // Decrypt the token to get the Slack token
             const slackToken = encryptionService.decryptToken(token);
-
 
             const authInfo = {
                 token: token,
