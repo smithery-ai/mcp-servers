@@ -73,7 +73,6 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
                 scopes: params.scopes || []
             });
 
-            console.log("sessionStore", this._sessionStore);
 
             const slackAuthUrl = new URL('https://slack.com/oauth/v2/authorize');
             const authParams = new URLSearchParams({
@@ -83,7 +82,6 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
                 state
             });
 
-            console.log("Redirecting to:", slackAuthUrl);
 
             res.redirect(`${slackAuthUrl}?${authParams}`);
         } catch (error) {
@@ -101,26 +99,18 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
         }
         // log the state and the code challenge
         const codeChallenge = this._sessionStore.get(state)?.codeChallenge || '';
-        console.log('sessionStore in challengeForAuthorizationCode', this._sessionStore);
-        console.log('challengeForAuthorizationCode', state, codeChallenge);
-
-          // Clean up session data
-        console.log("deleting state from sessionStore", state);
         this._sessionStore.delete(state);
         return codeChallenge;
     }
 
     async exchangeAuthorizationCode(client: OAuthClientInformationFull, authorizationCode: string): Promise<OAuthTokens> {
-        console.log('exchangeAuthorizationCode', authorizationCode);
         const { mcpAccessToken } = this._pendingAuthCodes.get(authorizationCode) || {};
         if (!mcpAccessToken) {
-            console.log('no mcpAccessToken');
             throw new Error("Invalid authorization code");
         }
 
         this._pendingAuthCodes.delete(authorizationCode);
 
-        console.log('exchangeAuthorizationCode', mcpAccessToken);
         return {
             access_token: mcpAccessToken,
             token_type: "Bearer"
@@ -129,10 +119,9 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
 
     async verifyAccessToken(token: string): Promise<AuthInfo> {
         try {
-            console.log("in verifyAccessToken", token);
             // Decrypt the token to get the Slack token
             const slackToken = encryptionService.decryptToken(token);
-            console.log("slackToken in verifyAccessToken", slackToken);
+
 
             const authInfo = {
                 token: token,
@@ -152,10 +141,8 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
                 throw new InvalidTokenError("Invalid Slack Access Token");
             }
             
-            console.log("authInfo in verifyAccessToken", authInfo);
             return authInfo;
         } catch (error) {
-            // this._accessTokenUserMap.delete(token);
             throw new InvalidTokenError("Invalid token");
         }
     }
@@ -166,7 +153,6 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
 
     // Modify handleOAuthCallback to use encryption
     async handleOAuthCallback(code: string, state: string): Promise<{ mcpAuthCode: string, redirectUrl: string }> {
-        console.log('in handleOAuthCallback', code, state);
         const sessionData = this._sessionStore.get(state);
         if (!sessionData) {
             throw new Error("Invalid state parameter");
@@ -184,7 +170,6 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
         });
 
         const data = await response.json();
-        console.log('data in handleOAuthCallback', data);
         if (!data.ok) {
             throw new Error("Failed to exchange code");
         }
@@ -200,7 +185,6 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
             mcpAccessToken,
             state
         });
-        console.log("returning from handleOAuthCallback", mcpAuthCode, sessionData.redirectUri);
 
         return { mcpAuthCode, redirectUrl: sessionData.redirectUri };
     }

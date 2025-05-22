@@ -9,14 +9,12 @@ import { WebClient } from "@slack/web-api"
 import { createStatefulServer } from "./stateful.js"
 import { z } from "zod"
 import { mcpAuthRouter } from "@modelcontextprotocol/sdk/server/auth/router.js"
-// import { mcpAuthRouter } from "./router.js"
 import { SlackServerAuthProvider } from "./provider.js"
 import express from 'express';
 import cors from "cors";
 import { encryptionService } from "./encryptionService.js"
 import { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js"
 import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js"
-// import { requireBearerAuth } from "./bearerAuth.js"
 
 let slackClient: WebClient | null = null
 
@@ -119,12 +117,19 @@ function setupResources(
 	)
 }
 
-function initializeSlackClient(server: McpServer, token: string, signingSecret?: string, appToken?: string) {
+/**
+ * Initializes the slack client
+ * @param server - The MCP server
+ * @param token - The slack token
+ */
+function initializeSlackClient(server: McpServer, token: string) {
 	if (slackClient) {
-		console.log("Slack Client already initialized", slackClient)
 		return
 	}
 	slackClient = new WebClient(token)
+
+	const appToken = process.env.SLACK_APP_TOKEN
+	const signingSecret = process.env.SLACK_SIGNING_SECRET
 
 	const socketMode = !!appToken && !!signingSecret
 	if (socketMode) {
@@ -139,17 +144,9 @@ const provider = new SlackServerAuthProvider
 const app = express();
 app.use(express.json())
 
-// log all requests including method header body 
-app.use((req, res, next) => {
-	console.log(`${req.method} ${req.url}`);
-	console.log('headers', req.headers);
-	console.log('body', req.body);
-	next();
-});
 
 // Add CORS middleware to main app BEFORE anything else
 app.use(cors({
-	//  add smithery url ?
     origin: ['http://localhost:5173', 'http://127.0.0.1:6274', 'http://localhost:3000', 'http://localhost:8081'],
 	// origin: '*',
     methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
@@ -166,18 +163,16 @@ app.use(cors({
     credentials: true
 }));
 
-// log all requests
-app.use((req, res, next) => {
-	console.log(`${req.method} ${req.url}`);
-	next();
-});
+
 
 app.use(mcpAuthRouter({
 	provider: provider,
-	// TODO: Change when deployed to smithery url
 	issuerUrl: new URL(process.env.SERVER_BASE_URL!),
 }))
 
+/**
+ * Add route to handle the OAuth callback from Slack, redirects Slack back to the client
+ */
 app.get("/oauth/callback", async(req, res) => {
 	const { code, state } = req.query;
 	if (!code || !state) {
@@ -188,7 +183,6 @@ app.get("/oauth/callback", async(req, res) => {
 	try {
 		const result = await provider.handleOAuthCallback(code as string, state as string);
 
-		console.log("Redirecting to:", result.redirectUrl, "with code:", result.mcpAuthCode)
 		res.redirect(`${result.redirectUrl}?code=${result.mcpAuthCode}`);
 	} catch (error) {
 		console.error("Error in callback handler:", error);
@@ -196,6 +190,7 @@ app.get("/oauth/callback", async(req, res) => {
 	}
 });
 
+// Adds bearer auth middleware to all requests to the MCP server, ensures Authorization header is set otherwise returns 401
 app.use('/mcp', requireBearerAuth({ provider: provider }))
 
 // Create stateful server with Slack client configuration
@@ -211,7 +206,16 @@ createStatefulServer<{}>(
 				version: "1.0.0",
 			})
 		
-
+			/**
+			 * 
+			 * This function is called for each tool call and is used to get the slack client.
+			 * The slack client is only initialized once when there is a valid access token 
+			 * and that is shared across all tool calls.
+			 * There is only a valid access token if the user has been through the oauth flow
+			 * 
+			 * @param extra - The request handler extra object containing auth info
+			 * @returns The slack client
+			 */
 			function getSlackClient(extra: RequestHandlerExtra<ServerRequest, ServerNotification>): WebClient {
 				if (!slackClient) {
 					const mcpToken = extra.authInfo?.token;
@@ -222,8 +226,7 @@ createStatefulServer<{}>(
 					if (!slackToken) {
 						throw new Error("Failed to decrypt token");
 					}
-					console.log("Initializing Slack Client", slackToken)
-					initializeSlackClient(server, slackToken, process.env.SLACK_SIGNING_SECRET, process.env.SLACK_APP_TOKEN);
+					initializeSlackClient(server, slackToken);
 				}
 		
 				return slackClient!;
