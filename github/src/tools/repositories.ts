@@ -19,66 +19,93 @@ export function registerRepositoryTools(server: McpServer, octokit: Octokit) {
 				})
 
 				// Extract comprehensive repository information
-				const repoDetails = {
-					// Basic info
-					name: response.data.name,
-					full_name: response.data.full_name,
-					description: response.data.description,
-					owner: {
-						login: response.data.owner.login,
-						type: response.data.owner.type,
-						avatar_url: response.data.owner.avatar_url,
-					},
+				const repoData = response.data
 
-					// URLs
-					html_url: response.data.html_url,
-					clone_url: response.data.clone_url,
-					git_url: response.data.git_url,
-					ssh_url: response.data.ssh_url,
-
-					// Stats
-					stars: response.data.stargazers_count,
-					watchers: response.data.watchers_count,
-					forks: response.data.forks_count,
-					open_issues: response.data.open_issues_count,
-					size: response.data.size,
-
-					// Repository info
-					language: response.data.language,
-					languages_url: response.data.languages_url,
-					topics: response.data.topics,
-					license: response.data.license,
-					default_branch: response.data.default_branch,
-
-					// Settings
-					private: response.data.private,
-					fork: response.data.fork,
-					archived: response.data.archived,
-					disabled: response.data.disabled,
-
-					// Features
-					has_issues: response.data.has_issues,
-					has_projects: response.data.has_projects,
-					has_wiki: response.data.has_wiki,
-					has_pages: response.data.has_pages,
-					has_downloads: response.data.has_downloads,
-					has_discussions: response.data.has_discussions,
-
-					// Timestamps
-					created_at: response.data.created_at,
-					updated_at: response.data.updated_at,
-					pushed_at: response.data.pushed_at,
-
-					// Additional info
-					homepage: response.data.homepage,
-					visibility: response.data.visibility,
-					allow_forking: response.data.allow_forking,
+				// Format timestamps
+				const formatDate = (dateStr: string) => {
+					return new Date(dateStr).toLocaleDateString("en-US", {
+						year: "numeric",
+						month: "short",
+						day: "numeric",
+					})
 				}
 
+				// Build Markdown output
+				let markdown = `# ${repoData.full_name}\n\n`
+
+				// Description
+				if (repoData.description) {
+					markdown += `> ${repoData.description}\n\n`
+				}
+
+				// Basic Info
+				markdown += `## Stats\n`
+				markdown += `- **Stars:** ${repoData.stargazers_count.toLocaleString()}\n`
+				markdown += `- **Forks:** ${repoData.forks_count.toLocaleString()}\n`
+				markdown += `- **Open Issues:** ${repoData.open_issues_count.toLocaleString()}\n`
+				markdown += `- **Watchers:** ${repoData.watchers_count.toLocaleString()}\n`
+				markdown += `- **Size:** ${(repoData.size / 1024).toFixed(2)} MB\n\n`
+
+				// Repository Info
+				markdown += `## Details\n`
+				markdown += `- **Primary Language:** ${repoData.language || "None"}\n`
+				markdown += `- **Default Branch:** \`${repoData.default_branch}\`\n`
+				markdown += `- **License:** ${repoData.license?.name || "No license"}\n`
+				markdown += `- **Visibility:** ${repoData.visibility}\n`
+
+				// Topics
+				if (repoData.topics && repoData.topics.length > 0) {
+					markdown += `- **Topics:** ${repoData.topics.map((t: string) => `\`${t}\``).join(", ")}\n`
+				}
+
+				// Status flags
+				const flags = []
+				if (repoData.private) flags.push("Private")
+				if (repoData.fork) flags.push("Fork")
+				if (repoData.archived) flags.push("Archived")
+				if (repoData.disabled) flags.push("Disabled")
+				if (flags.length > 0) {
+					markdown += `- **Status:** ${flags.join(", ")}\n`
+				}
+				markdown += "\n"
+
+				// URLs
+				markdown += `## Links\n`
+				markdown += `- **Repository:** ${repoData.html_url}\n`
+				markdown += `- **Clone:** \`${repoData.clone_url}\`\n`
+				markdown += `- **SSH:** \`${repoData.ssh_url}\`\n`
+				if (repoData.homepage) {
+					markdown += `- **Homepage:** ${repoData.homepage}\n`
+				}
+				markdown += "\n"
+
+				// Features
+				const features = []
+				if (repoData.has_issues) features.push("Issues")
+				if (repoData.has_projects) features.push("Projects")
+				if (repoData.has_wiki) features.push("Wiki")
+				if (repoData.has_pages) features.push("Pages")
+				if (repoData.has_downloads) features.push("Downloads")
+				if (repoData.has_discussions) features.push("Discussions")
+
+				if (features.length > 0) {
+					markdown += `## Features\n`
+					markdown += `Enabled: ${features.join(", ")}\n\n`
+				}
+
+				// Owner
+				markdown += `## Owner\n`
+				markdown += `- **Name:** [${repoData.owner.login}](https://github.com/${repoData.owner.login})\n`
+				markdown += `- **Type:** ${repoData.owner.type}\n\n`
+
+				// Timestamps
+				markdown += `## Timeline\n`
+				markdown += `- **Created:** ${formatDate(repoData.created_at)}\n`
+				markdown += `- **Last Updated:** ${formatDate(repoData.updated_at)}\n`
+				markdown += `- **Last Push:** ${formatDate(repoData.pushed_at)}\n`
+
 				return {
-					content: [
-						{ type: "text", text: JSON.stringify(repoDetails, null, 2) },
-					],
+					content: [{ type: "text", text: markdown }],
 				}
 			} catch (e: any) {
 				return {
