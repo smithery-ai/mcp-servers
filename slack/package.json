@@ -9,7 +9,7 @@
 		"dist"
 	],
 	"scripts": {
-		"build": "npx @smithery/cli build",
+		"build": "tsc -p .",
 		"dev": "tsx watch src/index.ts",
 		"check": "npx @biomejs/biome check --write --unsafe"
 	},
@@ -27,7 +27,8 @@
 	"devDependencies": {
 		"@types/content-type": "^1.1.9",
 		"@types/cors": "^2.8.19",
-		"@types/express": "^5.0.3"
+		"@types/express": "^5.0.3",
+		"@types/express-serve-static-core": "^5.0.6"
 	},
 	"module": "src/index.ts"
 }
