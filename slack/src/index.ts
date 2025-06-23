@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js"
+import { mcpAuthRouter } from "@modelcontextprotocol/sdk/server/auth/router.js"
+import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js"
 import {
 	McpServer,
 	ResourceTemplate,
@@ -6,14 +9,20 @@ import {
 import { SubscribeRequestSchema } from "@modelcontextprotocol/sdk/types.js"
 import blot from "@slack/bolt"
 import { WebClient } from "@slack/web-api"
+import cors from "cors"
+import "dotenv/config"
+import express from "express"
 import { z } from "zod"
+import { SlackServerAuthProvider } from "./provider.js"
+import { createStatefulServer } from "./stateful.js"
 
 function setupResources(
 	config: {
-		token: string
+		token?: string
 		signingSecret?: string
 		appToken?: string
 	},
+	auth: AuthInfo,
 	server: McpServer,
 ) {
 	const app = new blot.App({
@@ -106,15 +115,27 @@ function setupResources(
 }
 
 export const configSchema = z.object({
-	token: z.string(),
+	token: z.string().optional(),
 	signingSecret: z.string().optional(),
 	appToken: z.string().optional(),
 })
 
 // Create stateful server with Slack client configuration
-export default function ({ config }: { config: z.infer<typeof configSchema> }) {
+function createServer({
+	config,
+	auth,
+}: {
+	config: z.infer<typeof configSchema>
+	auth: AuthInfo
+}) {
 	try {
 		console.log("Starting Slack MCP Server...")
+
+		config.token = config.token ?? (auth.extra?.slackToken as string)
+
+		if (!config.token) {
+			throw new Error("Slack token not found")
+		}
 
 		// Create a new MCP server with the higher-level API
 		const server = new McpServer({
@@ -128,7 +149,7 @@ export default function ({ config }: { config: z.infer<typeof configSchema> }) {
 		const socketMode = !!config.appToken && !!config.signingSecret
 
 		if (socketMode) {
-			setupResources(config, server)
+			setupResources(config, auth, server)
 		}
 
 		// List channels tool
@@ -311,3 +332,67 @@ export default function ({ config }: { config: z.infer<typeof configSchema> }) {
 		throw e
 	}
 }
+
+const provider = new SlackServerAuthProvider()
+const app = express()
+
+// Add CORS middleware to main app BEFORE anything else
+app.use(
+	cors({
+		exposedHeaders: ["mcp-session-id"],
+	}),
+)
+
+app.use(express.json())
+
+app.use(
+	"/mcp",
+	requireBearerAuth({
+		verifier: provider,
+	}),
+)
+
+app.use(
+	// NOTE: Should allow bring your own client ID.
+	mcpAuthRouter({
+		provider: provider,
+		issuerUrl: new URL("http://localhost:8081"),
+	}),
+)
+
+app.get("/oauth/callback", async (req, res) => {
+	const { code, state } = req.query
+	if (!code || !state) {
+		res.status(400).send("Invalid request parameters")
+		return
+	}
+
+	try {
+		const result = await provider.handleOAuthCallback(
+			code as string,
+			state as string,
+		)
+		console.log(
+			"Redirecting to:",
+			result.redirectUrl,
+			"with code:",
+			result.mcpAuthCode,
+		)
+		const sep = result.redirectUrl.includes("?") ? "&" : "?"
+		res.redirect(`${result.redirectUrl}${sep}code=${result.mcpAuthCode}`)
+	} catch (error) {
+		console.error("Error in callback handler:", error)
+		res.status(400).send("Server error during authentication callback")
+	}
+})
+
+createStatefulServer(createServer, {
+	schema: configSchema,
+	app,
+})
+// Start the server
+const PORT = process.env.PORT || 8081
+
+app.listen(PORT, () => {
+	console.log(`MCP server running on port ${PORT}`)
+})
