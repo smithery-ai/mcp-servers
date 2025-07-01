@@ -15,8 +15,7 @@
 		"build": "npm run build --workspaces",
 		"dev": "npm run dev --workspaces",
 		"check": "npx @biomejs/biome check --write --unsafe .",
-		"check:ci": "npx @biomejs/biome check .",
-		"prepare": "npm run build"
+		"check:ci": "npx @biomejs/biome check ."
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.0.4",
