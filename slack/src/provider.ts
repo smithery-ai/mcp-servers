@@ -82,13 +82,16 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
 				scopes: params.scopes || [],
 			})
 
+			const host = res.req.get("host") || "localhost:8081"
+			const protocol = host.startsWith("localhost") ? "http" : "https"
+			const redirectUri = `${protocol}://${host}/oauth/callback`
+
 			const slackAuthUrl = new URL("https://slack.com/oauth/v2/authorize")
 			const authParams = new URLSearchParams({
 				client_id: process.env.SLACK_CLIENT_ID!,
 				scope:
 					"app_mentions:read,channels:read,channels:history,groups:read,groups:history,im:read,im:history,mpim:read,mpim:history,chat:write,chat:write.public,reactions:write,users:read,users.profile:read",
-				// redirect_uri: 'https://localhost:8081/oauth/callback',
-				redirect_uri: "https://3cece4dd.ngrok.smithery.ai/oauth/callback",
+				redirect_uri: redirectUri,
 				state,
 			})
 
@@ -168,6 +171,7 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
 	async handleOAuthCallback(
 		code: string,
 		state: string,
+		host?: string,
 	): Promise<{ mcpAuthCode: string; redirectUrl: string }> {
 		const sessionData = this._sessionStore.get(state)
 		if (!sessionData) {
@@ -175,16 +179,15 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
 		}
 
 		// TODO: Is this slack specific or standardized?
+		const redirectHost = host || "localhost:8081"
+		const protocol = redirectHost.startsWith("localhost") ? "http" : "https"
+		const redirectUri = `${protocol}://${redirectHost}/oauth/callback`
 
 		const formData = new FormData()
 		formData.append("code", code)
 		formData.append("client_id", process.env.SLACK_CLIENT_ID!)
 		formData.append("client_secret", process.env.SLACK_CLIENT_SECRET!)
-		// formData.append('redirect_uri', 'https://localhost:8081/oauth/callback');
-		formData.append(
-			"redirect_uri",
-			"https://3cece4dd.ngrok.smithery.ai/oauth/callback",
-		)
+		formData.append("redirect_uri", redirectUri)
 		// console.log("fetching...", formData);
 
 		const response = await fetch("https://slack.com/api/oauth.v2.access", {

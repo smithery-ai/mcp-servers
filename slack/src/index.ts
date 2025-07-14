@@ -354,10 +354,17 @@ app.use(
 
 app.use(
 	// NOTE: Should allow bring your own client ID.
-	mcpAuthRouter({
-		provider: provider,
-		issuerUrl: new URL("http://localhost:8081"),
-	}),
+	(req, res, next) => {
+		const host = req.get("host") || "localhost:8081"
+		const protocol = host.startsWith("localhost") ? "http" : "https"
+		const issuerUrl = new URL(`${protocol}://${host}`)
+		const router = mcpAuthRouter({
+			provider: provider,
+			issuerUrl: issuerUrl,
+		})
+
+		router(req, res, next)
+	},
 )
 
 app.get("/oauth/callback", async (req, res) => {
@@ -368,9 +375,11 @@ app.get("/oauth/callback", async (req, res) => {
 	}
 
 	try {
+		const host = req.get("host") || "localhost:8081"
 		const result = await provider.handleOAuthCallback(
 			code as string,
 			state as string,
+			host,
 		)
 		console.log(
 			"Redirecting to:",
