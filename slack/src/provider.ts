@@ -222,6 +222,10 @@ export class SlackServerAuthProvider implements OAuthServerProvider {
 		// Clean up session data
 		this._sessionStore.delete(state)
 
-		return { mcpAuthCode, redirectUrl: sessionData.redirectUri }
+		// Append the state parameter to the redirect URL to preserve it
+		const redirectUrl = new URL(sessionData.redirectUri)
+		redirectUrl.searchParams.set("state", state)
+
+		return { mcpAuthCode, redirectUrl: redirectUrl.toString() }
 	}
 }
