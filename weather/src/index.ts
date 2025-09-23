@@ -248,6 +248,8 @@ function formatTimeAgo(timestamp: string, timezone: string): string {
 // Optional: Define configuration schema to require configuration at connection time
 export const configSchema = z.object({})
 
+export const stateless = true;
+
 export default function createStatelessServer({
 	config,
 }: {
