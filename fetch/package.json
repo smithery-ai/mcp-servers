@@ -1,7 +1,7 @@
 {
-	"name": "@smithery/mcp-notion",
+	"name": "@smithery/fetch",
 	"version": "1.0.0",
-	"description": "MCP server for interacting with Notion",
+	"description": "TypeScript MCP server for making HTTP requests and extracting web page elements",
 	"license": "MIT",
 	"author": "Smithery",
 	"type": "module",
@@ -14,7 +14,10 @@
 		"check": "npx @biomejs/biome check --write --unsafe"
 	},
 	"dependencies": {
-		"@notionhq/client": "^3.1.3"
+		"cheerio": "^1.1.2"
 	},
-	"module": "src/index.ts"
+	"devDependencies": {
+		"@types/node": "^22.0.0"
+	},
+	"module": "./src/index.ts"
 }

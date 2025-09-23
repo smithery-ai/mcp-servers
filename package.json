@@ -9,7 +9,8 @@
 		"weather",
 		"notion",
 		"slack",
-		"sequentialthinking"
+		"sequentialthinking",
+		"fetch"
 	],
 	"scripts": {
 		"build": "npm run build --workspaces",
@@ -18,9 +19,13 @@
 		"check:ci": "npx @biomejs/biome check .",
 		"prepare": "npm run build"
 	},
+	"dependencies": {
+		"@modelcontextprotocol/sdk": "^1.12.1",
+		"zod": "^3.25.46"
+	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.0.4",
-		"@smithery/cli": "^1.2.9",
+		"@smithery/cli": "^1.3.0",
 		"@types/node": "^22",
 		"shx": "^0.3.4",
 		"tsx": "^4.19.4",

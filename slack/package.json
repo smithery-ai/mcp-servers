@@ -14,7 +14,6 @@
 		"check": "npx @biomejs/biome check --write --unsafe"
 	},
 	"dependencies": {
-		"@modelcontextprotocol/sdk": "^1.11.0",
 		"@slack/bolt": "^4.2.1",
 		"@slack/web-api": "^7.9.1",
 		"express-serve-static-core": "^0.1.1"
