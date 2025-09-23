@@ -5,7 +5,7 @@ import { z } from "zod"
 
 /**
  * Fetch Server - A general-purpose MCP server for making HTTP requests and extracting elements from web pages.
- * 
+ *
  * Features:
  * - Make HTTP requests to any URL
  * - Extract specific HTML elements using CSS selectors
@@ -23,10 +23,7 @@ export const configSchema = z.object({
 		.number()
 		.default(10000)
 		.describe("Request timeout in milliseconds"),
-	followRedirects: z
-		.boolean()
-		.default(true)
-		.describe("Follow HTTP redirects"),
+	followRedirects: z.boolean().default(true).describe("Follow HTTP redirects"),
 })
 
 type Config = z.infer<typeof configSchema>
@@ -38,7 +35,10 @@ interface RequestOptions {
 }
 
 // Helper function to make HTTP requests
-async function makeRequest(url: string, options: RequestOptions): Promise<Response> {
+async function makeRequest(
+	url: string,
+	options: RequestOptions,
+): Promise<Response> {
 	const controller = new AbortController()
 	const timeoutId = setTimeout(() => controller.abort(), options.timeout)
 
@@ -46,7 +46,8 @@ async function makeRequest(url: string, options: RequestOptions): Promise<Respon
 		const response = await fetch(url, {
 			headers: {
 				"User-Agent": options.userAgent,
-				Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+				Accept:
+					"text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
 				"Accept-Language": "en-US,en;q=0.5",
 				"Accept-Encoding": "gzip, deflate",
 				Connection: "keep-alive",
@@ -106,10 +107,11 @@ export default function createServer({ config }: { config: Config }) {
 			try {
 				const response = await makeRequest(url, requestOptions)
 				const content = await response.text()
-				
+
 				// Parse content type
-				const contentType = response.headers.get("content-type")?.split(";")[0] || "unknown"
-				
+				const contentType =
+					response.headers.get("content-type")?.split(";")[0] || "unknown"
+
 				// Basic content info
 				const contentInfo: Record<string, any> = {
 					content_type: contentType,
@@ -121,7 +123,9 @@ export default function createServer({ config }: { config: Config }) {
 				if (contentType.includes("text/html")) {
 					const $ = cheerio.load(content)
 					const title = $("title").text().trim()
-					const metaDescription = $('meta[name="description"]').attr("content")?.trim()
+					const metaDescription = $('meta[name="description"]')
+						.attr("content")
+						?.trim()
 
 					contentInfo.title = title || null
 					contentInfo.description = metaDescription || null
@@ -131,12 +135,16 @@ export default function createServer({ config }: { config: Config }) {
 					content: [
 						{
 							type: "text",
-							text: JSON.stringify({
-								status_code: response.status,
-								final_url: response.url,
-								headers: Object.fromEntries(response.headers.entries()),
-								content_info: contentInfo,
-							}, null, 2),
+							text: JSON.stringify(
+								{
+									status_code: response.status,
+									final_url: response.url,
+									headers: Object.fromEntries(response.headers.entries()),
+									content_info: contentInfo,
+								},
+								null,
+								2,
+							),
 						},
 					],
 				}
@@ -145,9 +153,13 @@ export default function createServer({ config }: { config: Config }) {
 					content: [
 						{
 							type: "text",
-							text: JSON.stringify({
-								error: `Request failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-							}, null, 2),
+							text: JSON.stringify(
+								{
+									error: `Request failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+								},
+								null,
+								2,
+							),
 						},
 					],
 				}
@@ -161,9 +173,21 @@ export default function createServer({ config }: { config: Config }) {
 		"Extract specific elements from a web page using CSS selectors.",
 		{
 			url: z.string().describe("The URL to fetch"),
-			selector: z.string().describe("CSS selector to find elements (e.g., 'img', '.class', '#id', 'link[rel*=\"icon\"]')"),
-			attribute: z.string().optional().describe("Optional attribute to extract from elements (e.g., 'href', 'src', 'alt')"),
-			limit: z.number().default(10).describe("Maximum number of elements to return"),
+			selector: z
+				.string()
+				.describe(
+					"CSS selector to find elements (e.g., 'img', '.class', '#id', 'link[rel*=\"icon\"]')",
+				),
+			attribute: z
+				.string()
+				.optional()
+				.describe(
+					"Optional attribute to extract from elements (e.g., 'href', 'src', 'alt')",
+				),
+			limit: z
+				.number()
+				.default(10)
+				.describe("Maximum number of elements to return"),
 		},
 		async ({ url, selector, attribute, limit }) => {
 			try {
@@ -178,13 +202,17 @@ export default function createServer({ config }: { config: Config }) {
 						content: [
 							{
 								type: "text",
-								text: JSON.stringify({
-									url: response.url,
-									selector,
-									elements: [],
-									count: 0,
-									message: `No elements found matching selector: ${selector}`,
-								}, null, 2),
+								text: JSON.stringify(
+									{
+										url: response.url,
+										selector,
+										elements: [],
+										count: 0,
+										message: `No elements found matching selector: ${selector}`,
+									},
+									null,
+									2,
+								),
 							},
 						],
 					}
@@ -200,8 +228,12 @@ export default function createServer({ config }: { config: Config }) {
 						let value = $el.attr(attribute)
 						if (value) {
 							// Convert relative URLs to absolute
-							if ((attribute === "href" || attribute === "src") && 
-								(value.startsWith("/") || value.startsWith("./") || value.startsWith("../"))) {
+							if (
+								(attribute === "href" || attribute === "src") &&
+								(value.startsWith("/") ||
+									value.startsWith("./") ||
+									value.startsWith("../"))
+							) {
 								value = resolveUrl(response.url, value)
 							}
 							extracted.push({
@@ -222,9 +254,13 @@ export default function createServer({ config }: { config: Config }) {
 						const attrs = (element as any).attribs || {}
 						for (const [attrName, attrValue] of Object.entries(attrs)) {
 							let processedValue = attrValue
-							if ((attrName === "href" || attrName === "src") && 
+							if (
+								(attrName === "href" || attrName === "src") &&
 								typeof attrValue === "string" &&
-								(attrValue.startsWith("/") || attrValue.startsWith("./") || attrValue.startsWith("../"))) {
+								(attrValue.startsWith("/") ||
+									attrValue.startsWith("./") ||
+									attrValue.startsWith("../"))
+							) {
 								processedValue = resolveUrl(response.url, attrValue)
 							}
 							elemData.attributes[attrName] = processedValue
@@ -238,13 +274,17 @@ export default function createServer({ config }: { config: Config }) {
 					content: [
 						{
 							type: "text",
-							text: JSON.stringify({
-								url: response.url,
-								selector,
-								elements: extracted,
-								count: extracted.length,
-								total_found: $(selector).length,
-							}, null, 2),
+							text: JSON.stringify(
+								{
+									url: response.url,
+									selector,
+									elements: extracted,
+									count: extracted.length,
+									total_found: $(selector).length,
+								},
+								null,
+								2,
+							),
 						},
 					],
 				}
@@ -253,9 +293,13 @@ export default function createServer({ config }: { config: Config }) {
 					content: [
 						{
 							type: "text",
-							text: JSON.stringify({
-								error: `Request failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-							}, null, 2),
+							text: JSON.stringify(
+								{
+									error: `Request failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+								},
+								null,
+								2,
+							),
 						},
 					],
 				}
@@ -305,7 +349,9 @@ export default function createServer({ config }: { config: Config }) {
 					// Standard meta tags
 					if (name === "description") {
 						metadata.description = content
-					} else if (["keywords", "author", "viewport", "robots"].includes(name)) {
+					} else if (
+						["keywords", "author", "viewport", "robots"].includes(name)
+					) {
 						metadata.meta_tags.push({ name, content })
 					}
 
@@ -341,9 +387,13 @@ export default function createServer({ config }: { config: Config }) {
 					content: [
 						{
 							type: "text",
-							text: JSON.stringify({
-								error: `Request failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-							}, null, 2),
+							text: JSON.stringify(
+								{
+									error: `Request failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+								},
+								null,
+								2,
+							),
 						},
 					],
 				}

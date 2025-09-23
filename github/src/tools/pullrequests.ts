@@ -644,14 +644,13 @@ export function registerPullRequestTools(server: McpServer, octokit: Octokit) {
 				.enum(["created", "updated"])
 				.optional()
 				.describe("Sort comments by created or updated time"),
-			direction: z
-				.enum(["asc", "desc"])
-				.optional()
-				.describe("Sort direction"),
+			direction: z.enum(["asc", "desc"]).optional().describe("Sort direction"),
 			since: z
 				.string()
 				.optional()
-				.describe("Only show comments updated after this time (ISO 8601 format)"),
+				.describe(
+					"Only show comments updated after this time (ISO 8601 format)",
+				),
 			per_page: z
 				.number()
 				.optional()
@@ -663,7 +662,16 @@ export function registerPullRequestTools(server: McpServer, octokit: Octokit) {
 				.default(1)
 				.describe("Page number (default 1)"),
 		},
-		async ({ owner, repo, pullNumber, sort, direction, since, per_page, page }) => {
+		async ({
+			owner,
+			repo,
+			pullNumber,
+			sort,
+			direction,
+			since,
+			per_page,
+			page,
+		}) => {
 			try {
 				const response = await octokit.rest.pulls.listReviewComments({
 					owner,
@@ -701,22 +709,22 @@ export function registerPullRequestTools(server: McpServer, octokit: Octokit) {
 					markdown += `## Comment ${index + 1}\n\n`
 					markdown += `- **Author:** ${comment.user?.login || "Unknown"}\n`
 					markdown += `- **File:** ${comment.path}\n`
-					
+
 					if (comment.line) {
 						markdown += `- **Line:** ${comment.line}\n`
 					}
-					
+
 					if (comment.start_line && comment.start_line !== comment.line) {
 						markdown += `- **Lines:** ${comment.start_line}-${comment.line}\n`
 					}
-					
+
 					markdown += `- **Side:** ${comment.side || "RIGHT"}\n`
 					markdown += `- **Created:** ${new Date(comment.created_at).toLocaleDateString()}\n`
-					
+
 					if (comment.updated_at !== comment.created_at) {
 						markdown += `- **Updated:** ${new Date(comment.updated_at).toLocaleDateString()}\n`
 					}
-					
+
 					if (comment.commit_id) {
 						markdown += `- **Commit:** ${comment.commit_id.substring(0, 7)}\n`
 					}
@@ -726,7 +734,7 @@ export function registerPullRequestTools(server: McpServer, octokit: Octokit) {
 					}
 
 					markdown += `\n**Comment:**\n${comment.body}\n`
-					
+
 					if (comment.html_url) {
 						markdown += `\n**URL:** ${comment.html_url}\n`
 					}
@@ -756,8 +764,14 @@ export function registerPullRequestTools(server: McpServer, octokit: Octokit) {
 			body: z.string().describe("Comment body"),
 			commit_id: z.string().describe("SHA of the commit to comment on"),
 			path: z.string().describe("Relative path to the file being commented on"),
-			line: z.number().optional().describe("Line number for single-line comment"),
-			start_line: z.number().optional().describe("Start line for multi-line comment"),
+			line: z
+				.number()
+				.optional()
+				.describe("Line number for single-line comment"),
+			start_line: z
+				.number()
+				.optional()
+				.describe("Start line for multi-line comment"),
 			side: z
 				.enum(["LEFT", "RIGHT"])
 				.optional()
@@ -806,18 +820,18 @@ export function registerPullRequestTools(server: McpServer, octokit: Octokit) {
 				markdown += `- **Comment ID:** ${comment.id}\n`
 				markdown += `- **Author:** ${comment.user?.login || "Unknown"}\n`
 				markdown += `- **File:** ${comment.path}\n`
-				
+
 				if (comment.line) {
 					markdown += `- **Line:** ${comment.line}\n`
 				}
-				
+
 				if (comment.start_line && comment.start_line !== comment.line) {
 					markdown += `- **Lines:** ${comment.start_line}-${comment.line}\n`
 				}
-				
+
 				markdown += `- **Side:** ${comment.side || "RIGHT"}\n`
 				markdown += `- **Created:** ${new Date(comment.created_at).toLocaleDateString()}\n`
-				
+
 				if (comment.commit_id) {
 					markdown += `- **Commit:** ${comment.commit_id.substring(0, 7)}\n`
 				}
