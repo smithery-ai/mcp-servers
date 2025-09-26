@@ -1,4 +1,5 @@
 # GitHub Tools
+[![smithery badge](https://smithery.ai/badge/@smithery-ai/github)](https://smithery.ai/server/@smithery-ai/github)
 
 Model Context Protocol (MCP) server for accessing Github.
 
