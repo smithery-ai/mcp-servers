@@ -1,5 +1,7 @@
 # Notion MCP Server (TypeScript)
 
+[![smithery badge](https://smithery.ai/badge/@smithery/notion)](https://smithery.ai/server/@smithery/notion)
+
 A Model Context Protocol (MCP) server for Notion, written in TypeScript. This server provides comprehensive access to Notion's API, enabling AI assistants to interact with Notion databases, pages, blocks, and search functionality.
 
 ## Features
@@ -12,6 +14,15 @@ A Model Context Protocol (MCP) server for Notion, written in TypeScript. This se
 
 ## Installation
 
+### Installing via Smithery
+
+To install Notion for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@smithery/notion):
+
+```bash
+npx -y @smithery/cli install @smithery/notion --client claude
+```
+
+### Manual Installation
 1. Clone or copy this directory
 2. Install dependencies:
    ```bash
