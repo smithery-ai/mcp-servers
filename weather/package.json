@@ -13,7 +13,8 @@
 	"author": "",
 	"license": "ISC",
 	"dependencies": {
-		"@modelcontextprotocol/sdk": "^1.12.1",
+		"@modelcontextprotocol/sdk": "^1.18.2",
+		"@smithery/sdk": "^1.6.4",
 		"zod": "^3.25.46"
 	}
 }
