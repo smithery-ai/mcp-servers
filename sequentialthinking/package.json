@@ -14,6 +14,10 @@
 	"license": "ISC",
 	"dependencies": {
 		"@modelcontextprotocol/sdk": "^1.18.1",
+		"@smithery/sdk": "^1.6.6",
 		"zod": "^3.25.46"
+	},
+	"devDependencies": {
+		"@smithery/cli": "^1.4.2"
 	}
 }
