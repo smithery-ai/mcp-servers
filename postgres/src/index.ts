@@ -63,8 +63,10 @@ function checkPermissions(
 
 export default function createServer({
 	config,
+	logger,
 }: {
 	config: z.infer<typeof configSchema>
+	logger: { info: Function; error: Function; warn: Function; debug: Function }
 }) {
 	const server = new McpServer({
 		name: "PostgreSQL Server",
@@ -329,6 +331,8 @@ export default function createServer({
 			},
 		},
 		async ({ sql }) => {
+			logger.info({ sql, role: config.role }, 'Executing SQL query')
+			
 			// Check if command is allowed with granted privileges
 			checkPermissions(sql, grantedPrivileges)
 
@@ -387,16 +391,18 @@ export default function createServer({
 				} else {
 					await client.query("BEGIN")
 				}
-				const result = await client.query(sql)
-				await client.query("COMMIT")
+			const result = await client.query(sql)
+			await client.query("COMMIT")
 
-				// Format response based on whether rows were returned
-				const responseText =
-					result.rows.length > 0
-						? JSON.stringify(result.rows, null, 2)
-						: `${command} successful. ${result.rowCount || 0} row(s) affected.`
+			// Format response based on whether rows were returned
+			const responseText =
+				result.rows.length > 0
+					? JSON.stringify(result.rows, null, 2)
+					: `${command} successful. ${result.rowCount || 0} row(s) affected.`
 
-				return {
+			logger.info({ rowCount: result.rows.length, command }, 'Query completed successfully')
+
+			return {
 					content: [
 						{
 							type: "text",
@@ -404,13 +410,14 @@ export default function createServer({
 						},
 					],
 				}
-			} catch (error) {
-				await client
-					.query("ROLLBACK")
-					.catch(rollbackError =>
-						console.warn("Could not roll back transaction:", rollbackError),
-					)
-				throw error
+		} catch (error) {
+			await client
+				.query("ROLLBACK")
+				.catch(rollbackError =>
+					console.warn("Could not roll back transaction:", rollbackError),
+				)
+			logger.error({ error, sql }, 'Query failed')
+			throw error
 			} finally {
 				client.release()
 			}
