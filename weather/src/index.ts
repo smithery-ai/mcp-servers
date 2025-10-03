@@ -245,7 +245,7 @@ function formatTimeAgo(timestamp: string, timezone: string): string {
 	}
 }
 
-export const stateless = true;
+export const stateless = true
 
 export default function createStatelessServer() {
 	const server = new McpServer({

@@ -1,4 +1,7 @@
-import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js"
+import {
+	McpServer,
+	ResourceTemplate,
+} from "@modelcontextprotocol/sdk/server/mcp.js"
 import { z } from "zod"
 import pg from "pg"
 
@@ -7,7 +10,16 @@ const databaseRoles = {
 	read: ["SELECT"],
 	insert: ["SELECT", "INSERT"],
 	write: ["SELECT", "INSERT", "UPDATE", "DELETE"],
-	admin: ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "CREATE", "ALTER", "DROP"],
+	admin: [
+		"SELECT",
+		"INSERT",
+		"UPDATE",
+		"DELETE",
+		"TRUNCATE",
+		"CREATE",
+		"ALTER",
+		"DROP",
+	],
 } as const
 
 export const configSchema = z.object({
@@ -25,7 +37,10 @@ export const configSchema = z.object({
 })
 
 // Helper function to check if SQL command is allowed based on granted privileges
-function checkPermissions(sql: string, grantedPrivileges: readonly string[]): void {
+function checkPermissions(
+	sql: string,
+	grantedPrivileges: readonly string[],
+): void {
 	const command = sql.trim().toUpperCase().split(/[\s;]/)[0]
 
 	// Map command to required privilege
@@ -98,7 +113,9 @@ export default function createServer({
 	// Dynamic resource: individual table schemas with parameters
 	server.registerResource(
 		"table-schema",
-		new ResourceTemplate("postgres://tables/{tableName}/schema", { list: undefined }),
+		new ResourceTemplate("postgres://tables/{tableName}/schema", {
+			list: undefined,
+		}),
 		{
 			title: "Table Schema",
 			description: "Schema information for a specific database table",
@@ -113,7 +130,10 @@ export default function createServer({
 				)
 
 				const schemaText = result.rows
-					.map(row => `${row.column_name}: ${row.data_type}${row.is_nullable === "NO" ? " NOT NULL" : ""}${row.column_default ? ` DEFAULT ${row.column_default}` : ""}`)
+					.map(
+						row =>
+							`${row.column_name}: ${row.data_type}${row.is_nullable === "NO" ? " NOT NULL" : ""}${row.column_default ? ` DEFAULT ${row.column_default}` : ""}`,
+					)
 					.join("\n")
 
 				return {
@@ -134,7 +154,11 @@ export default function createServer({
 	// Checkpoint mode state management
 	let sessionClient: pg.PoolClient | null = null
 	let checkpointMode = false
-	let checkpointHistory: Array<{ id: number; query: string; timestamp: string }> = []
+	let checkpointHistory: Array<{
+		id: number
+		query: string
+		timestamp: string
+	}> = []
 	let checkpointCounter = 0
 
 	// Unified checkpoint management tool
@@ -142,12 +166,20 @@ export default function createServer({
 		"checkpoint",
 		{
 			title: "Checkpoint Management",
-			description: "Manage database checkpoints for safe experimentation. Start checkpoint mode to enable undo/redo capabilities.",
+			description:
+				"Manage database checkpoints for safe experimentation. Start checkpoint mode to enable undo/redo capabilities.",
 			inputSchema: {
-				action: z.enum(["start", "list", "rollback", "commit", "discard"]).describe(
-					"Action to perform: 'start' (begin checkpoint mode), 'list' (show checkpoints), 'rollback' (undo to checkpoint), 'commit' (save changes), 'discard' (throw away all changes)"
-				),
-				checkpointId: z.number().optional().describe("Checkpoint ID to rollback to (only used with 'rollback' action)"),
+				action: z
+					.enum(["start", "list", "rollback", "commit", "discard"])
+					.describe(
+						"Action to perform: 'start' (begin checkpoint mode), 'list' (show checkpoints), 'rollback' (undo to checkpoint), 'commit' (save changes), 'discard' (throw away all changes)",
+					),
+				checkpointId: z
+					.number()
+					.optional()
+					.describe(
+						"Checkpoint ID to rollback to (only used with 'rollback' action)",
+					),
 			},
 		},
 		async ({ action, checkpointId }) => {
@@ -163,19 +195,34 @@ export default function createServer({
 				checkpointHistory = []
 				checkpointCounter = 0
 				return {
-					content: [{ type: "text", text: "Checkpoint mode started. All write queries will be automatically checkpointed. Use checkpoint({ action: 'commit' }) to save or checkpoint({ action: 'discard' }) to rollback." }],
+					content: [
+						{
+							type: "text",
+							text: "Checkpoint mode started. All write queries will be automatically checkpointed. Use checkpoint({ action: 'commit' }) to save or checkpoint({ action: 'discard' }) to rollback.",
+						},
+					],
 				}
 			}
 
 			if (action === "list") {
 				if (!checkpointMode) {
 					return {
-						content: [{ type: "text", text: "No active checkpoint session. Use checkpoint({ action: 'start' }) to begin." }],
+						content: [
+							{
+								type: "text",
+								text: "No active checkpoint session. Use checkpoint({ action: 'start' }) to begin.",
+							},
+						],
 					}
 				}
 				if (checkpointHistory.length === 0) {
 					return {
-						content: [{ type: "text", text: "No checkpoints yet. Execute some write queries to create checkpoints." }],
+						content: [
+							{
+								type: "text",
+								text: "No checkpoints yet. Execute some write queries to create checkpoints.",
+							},
+						],
 					}
 				}
 				const list = checkpointHistory
@@ -197,11 +244,20 @@ export default function createServer({
 				if (!checkpoint) {
 					throw new Error(`Checkpoint ${checkpointId} not found`)
 				}
-				await sessionClient.query(`ROLLBACK TO SAVEPOINT checkpoint_${checkpointId}`)
+				await sessionClient.query(
+					`ROLLBACK TO SAVEPOINT checkpoint_${checkpointId}`,
+				)
 				// Remove checkpoints after this one
-				checkpointHistory = checkpointHistory.filter(cp => cp.id <= checkpointId)
+				checkpointHistory = checkpointHistory.filter(
+					cp => cp.id <= checkpointId,
+				)
 				return {
-					content: [{ type: "text", text: `Rolled back to checkpoint ${checkpointId}: ${checkpoint.query}` }],
+					content: [
+						{
+							type: "text",
+							text: `Rolled back to checkpoint ${checkpointId}: ${checkpoint.query}`,
+						},
+					],
 				}
 			}
 
@@ -217,7 +273,12 @@ export default function createServer({
 				checkpointHistory = []
 				checkpointCounter = 0
 				return {
-					content: [{ type: "text", text: `Changes committed successfully. ${count} checkpoints finalized.` }],
+					content: [
+						{
+							type: "text",
+							text: `Changes committed successfully. ${count} checkpoints finalized.`,
+						},
+					],
 				}
 			}
 
@@ -233,7 +294,12 @@ export default function createServer({
 				checkpointHistory = []
 				checkpointCounter = 0
 				return {
-					content: [{ type: "text", text: `All changes discarded. ${count} checkpoints rolled back.` }],
+					content: [
+						{
+							type: "text",
+							text: `All changes discarded. ${count} checkpoints rolled back.`,
+						},
+					],
 				}
 			}
 
@@ -245,8 +311,10 @@ export default function createServer({
 	const isReadOnly = config.role === "read"
 	const roleDescriptions = {
 		read: "Run read-only SQL queries (SELECT privilege)",
-		insert: "Run append-only queries (SELECT, INSERT privileges - no modifications to existing data)",
-		write: "Run data modification queries (SELECT, INSERT, UPDATE, DELETE privileges)",
+		insert:
+			"Run append-only queries (SELECT, INSERT privileges - no modifications to existing data)",
+		write:
+			"Run data modification queries (SELECT, INSERT, UPDATE, DELETE privileges)",
 		admin: "Run any SQL queries including DDL (all privileges)",
 	}
 	const description = `${roleDescriptions[config.role]} - Role: ${config.role}`
@@ -266,13 +334,22 @@ export default function createServer({
 
 			// Determine if this is a write operation
 			const command = sql.trim().toUpperCase().split(/[\s;]/)[0]
-			const writeCommands = ["INSERT", "UPDATE", "DELETE", "TRUNCATE", "CREATE", "ALTER", "DROP", "RENAME"]
+			const writeCommands = [
+				"INSERT",
+				"UPDATE",
+				"DELETE",
+				"TRUNCATE",
+				"CREATE",
+				"ALTER",
+				"DROP",
+				"RENAME",
+			]
 			const isWrite = writeCommands.includes(command)
 
 			// If in checkpoint mode, use session client and auto-checkpoint writes
 			if (checkpointMode && sessionClient) {
 				const result = await sessionClient.query(sql)
-				
+
 				if (isWrite) {
 					// Create checkpoint after successful write
 					checkpointCounter++
@@ -284,12 +361,13 @@ export default function createServer({
 						timestamp: new Date().toISOString(),
 					})
 				}
-				
+
 				// Format response based on whether rows were returned
-				const responseText = result.rows.length > 0
-					? JSON.stringify(result.rows, null, 2)
-					: `${command} successful. ${result.rowCount || 0} row(s) affected.`
-				
+				const responseText =
+					result.rows.length > 0
+						? JSON.stringify(result.rows, null, 2)
+						: `${command} successful. ${result.rowCount || 0} row(s) affected.`
+
 				return {
 					content: [
 						{
@@ -311,12 +389,13 @@ export default function createServer({
 				}
 				const result = await client.query(sql)
 				await client.query("COMMIT")
-				
+
 				// Format response based on whether rows were returned
-				const responseText = result.rows.length > 0
-					? JSON.stringify(result.rows, null, 2)
-					: `${command} successful. ${result.rowCount || 0} row(s) affected.`
-				
+				const responseText =
+					result.rows.length > 0
+						? JSON.stringify(result.rows, null, 2)
+						: `${command} successful. ${result.rowCount || 0} row(s) affected.`
+
 				return {
 					content: [
 						{
