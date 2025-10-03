@@ -10,7 +10,8 @@
 		"notion",
 		"slack",
 		"sequentialthinking",
-		"fetch"
+		"fetch",
+		"postgres"
 	],
 	"scripts": {
 		"build": "npm run build --workspaces",
