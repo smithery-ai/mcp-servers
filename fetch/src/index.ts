@@ -26,7 +26,7 @@ export const configSchema = z.object({
 	followRedirects: z.boolean().default(true).describe("Follow HTTP redirects"),
 })
 
-export const stateless = true;
+export const stateless = true
 
 type Config = z.infer<typeof configSchema>
 

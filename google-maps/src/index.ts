@@ -137,7 +137,7 @@ export const configSchema = z.object({
 		),
 })
 
-export const stateless = true;
+export const stateless = true
 
 export default function createStatelessServer({
 	config,

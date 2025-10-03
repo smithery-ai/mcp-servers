@@ -1,0 +1,24 @@
+{
+	"name": "smithery-scaffold",
+	"version": "1.0.0",
+	"description": "",
+	"main": "index.js",
+	"module": "./src/index.ts",
+	"type": "module",
+	"scripts": {
+		"dev": "smithery dev",
+		"build": "smithery build"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "ISC",
+	"dependencies": {
+		"@modelcontextprotocol/sdk": "^1.18.2",
+		"pg": "^8.16.3",
+		"zod": "^3.25.46"
+	},
+	"devDependencies": {
+		"@smithery/cli": "^1.4.5",
+		"@types/pg": "^8.11.10"
+	}
+}
