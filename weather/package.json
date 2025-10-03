@@ -6,14 +6,18 @@
 	"module": "./src/index.ts",
 	"type": "module",
 	"scripts": {
-		"build": "npx @smithery/cli build",
-		"dev": "npx @smithery/cli dev"
+		"build": "smithery build",
+		"dev": "smithery dev"
 	},
 	"keywords": [],
 	"author": "",
 	"license": "ISC",
 	"dependencies": {
+		"@smithery/sdk": "^1.4.5",
 		"@modelcontextprotocol/sdk": "^1.18.1",
 		"zod": "^3.25.46"
+	},
+	"devDependencies": {
+		"@smithery/cli": "^1.4.5"
 	}
 }

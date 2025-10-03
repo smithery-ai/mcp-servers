@@ -245,16 +245,9 @@ function formatTimeAgo(timestamp: string, timezone: string): string {
 	}
 }
 
-// Optional: Define configuration schema to require configuration at connection time
-export const configSchema = z.object({})
-
 export const stateless = true;
 
-export default function createStatelessServer({
-	config,
-}: {
-	config: z.infer<typeof configSchema>
-}) {
+export default function createStatelessServer() {
 	const server = new McpServer({
 		name: "United States Weather MCP Server",
 		version: "1.0.0",
