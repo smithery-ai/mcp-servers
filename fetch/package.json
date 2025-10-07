@@ -9,8 +9,8 @@
 		"dist"
 	],
 	"scripts": {
-		"build": "npx @smithery/cli build",
-		"dev": "npx @smithery/cli dev",
+		"build": "smithery build",
+		"dev": "smithery dev",
 		"check": "npx @biomejs/biome check --write --unsafe"
 	},
 	"dependencies": {
@@ -19,7 +19,8 @@
 		"zod": "^3.25.46"
 	},
 	"devDependencies": {
-		"@types/node": "^22.0.0"
+		"@types/node": "^22.0.0",
+		"@smithery/cli": "^1.4.6"
 	},
 	"module": "./src/index.ts"
 }
