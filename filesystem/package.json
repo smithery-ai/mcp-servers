@@ -1,0 +1,26 @@
+{
+	"name": "@smithery/filesystem-server",
+	"version": "0.3.0",
+	"description": "Secure MCP Filesystem Server with path validation and security controls",
+	"main": "index.js",
+	"module": "./src/index.ts",
+	"type": "module",
+	"scripts": {
+		"dev": "npx smithery dev",
+		"build": "npx smithery build"
+	},
+	"keywords": ["mcp", "filesystem", "modelcontextprotocol", "smithery"],
+	"author": "",
+	"license": "MIT",
+	"dependencies": {
+		"@modelcontextprotocol/sdk": "^1.18.2",
+		"@smithery/sdk": "^1.6.4",
+		"glob": "^11.0.0",
+		"minimatch": "^10.0.1",
+		"zod": "^3.25.46"
+	},
+	"devDependencies": {
+		"@smithery/cli": "^1.4.6",
+		"@types/node": "^20.0.0"
+	}
+}
