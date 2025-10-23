@@ -8,7 +8,7 @@ import { registerRepositoryTools } from "./tools/repositories.js"
 import { registerSearchTools } from "./tools/search.js"
 
 export const configSchema = z.object({
-	githubPersonalAccessToken: z.string(),
+	githubPersonalAccessToken: z.string().describe("GitHub personal access token for authentication. Create one at: https://github.com/settings/personal-access-tokens"),
 })
 
 export default function ({ config }: { config: z.infer<typeof configSchema> }) {

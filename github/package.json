@@ -9,8 +9,8 @@
 		"dist"
 	],
 	"scripts": {
-		"build": "npx @smithery/cli build",
-		"dev": "npx @smithery/cli dev",
+		"build": "smithery build",
+		"dev": "smithery dev",
 		"check": "npx @biomejs/biome check --write --unsafe"
 	},
 	"dependencies": {
@@ -21,6 +21,6 @@
 	},
 	"module": "src/index.ts",
 	"devDependencies": {
-		"@smithery/cli": "^1.4.0"
+		"@smithery/cli": "^1.6.2"
 	}
 }
